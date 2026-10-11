@@ -289,4 +289,50 @@ void main() {
     expect(game.currentPlayer.hand, [newCard]);
     expect(game.currentPlayer.melds.first.cards, [existingCard]);
   });
+
+  test('Reorders a card within its meld', () {
+    final first = game.deck.cards.removeLast();
+    final middle = game.deck.cards.removeLast();
+    final last = game.deck.cards.removeLast();
+    game.currentPlayer.melds.add(Meld(cards: [first, middle, last]));
+
+    expect(gameService.reorderMeldCard(0, first.id, 3), isTrue);
+    expect(game.currentPlayer.melds.first.cards, [middle, last, first]);
+  });
+
+  test('Reorder insertion index is interpreted before source removal', () {
+    final first = game.deck.cards.removeLast();
+    final middle = game.deck.cards.removeLast();
+    final last = game.deck.cards.removeLast();
+    game.currentPlayer.melds.add(Meld(cards: [first, middle, last]));
+
+    expect(gameService.reorderMeldCard(0, last.id, 0), isTrue);
+    expect(game.currentPlayer.melds.first.cards, [last, first, middle]);
+    expect(gameService.reorderMeldCard(0, last.id, 3), isTrue);
+    expect(game.currentPlayer.melds.first.cards, [first, middle, last]);
+  });
+
+  test('Rejects reordering into a different meld and preserves both melds', () {
+    final first = game.deck.cards.removeLast();
+    final second = game.deck.cards.removeLast();
+    game.currentPlayer.melds.add(Meld(cards: [first]));
+    game.currentPlayer.melds.add(Meld(cards: [second]));
+
+    expect(gameService.reorderMeldCard(0, first.id, 1), isTrue);
+    expect(game.currentPlayer.melds, hasLength(2));
+    expect(game.currentPlayer.melds[0].cards, [first]);
+    expect(game.currentPlayer.melds[1].cards, [second]);
+    expect(gameService.reorderMeldCard(1, first.id, 0), isFalse);
+    expect(game.currentPlayer.melds[0].cards, [first]);
+    expect(game.currentPlayer.melds[1].cards, [second]);
+  });
+
+  test('Invalid meld reorder preserves the original order', () {
+    final first = game.deck.cards.removeLast();
+    final second = game.deck.cards.removeLast();
+    game.currentPlayer.melds.add(Meld(cards: [first, second]));
+
+    expect(gameService.reorderMeldCard(0, first.id, 99), isFalse);
+    expect(game.currentPlayer.melds.first.cards, [first, second]);
+  });
 }
