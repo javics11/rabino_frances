@@ -10,7 +10,9 @@ class PlayerHandWidget extends StatefulWidget {
   final Set<int> selectedIndexes;
   final Function(int)? onCardTapped;
   final ValueChanged<Set<int>>? onSelectionChanged;
-  final Function(CardModel, Offset)? onCardDropped;
+  final Function(List<CardModel>, Offset)? onCardDropped;
+  final ValueChanged<Offset>? onCardDragUpdated;
+  final VoidCallback? onCardDragEnded;
   final bool showFront;
 
   const PlayerHandWidget({
@@ -20,6 +22,8 @@ class PlayerHandWidget extends StatefulWidget {
     this.onCardTapped,
     this.onSelectionChanged,
     this.onCardDropped,
+    this.onCardDragUpdated,
+    this.onCardDragEnded,
     this.showFront = true,
   });
 
@@ -171,14 +175,23 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
                                         dragOffset += details.delta;
                                         fingerPosition = details.globalPosition;
                                       });
+
+                                      final dragPosition = Offset(
+                                        details.globalPosition.dx - dragAnchorX,
+                                        details.globalPosition.dy,
+                                      );
+
+                                      widget.onCardDragUpdated?.call(
+                                        dragPosition,
+                                      );
                                     }
                                   : null,
 
                               onPanEnd: widget.showFront
                                   ? (_) {
-                                      final droppedCard = draggingIndex != null
-                                          ? widget.hand[draggingIndex!]
-                                          : null;
+                                      final droppedCards = draggingIndexes
+                                          .map((index) => widget.hand[index])
+                                          .toList();
 
                                       final dropPosition = Offset(
                                         fingerPosition.dx - dragAnchorX,
@@ -231,13 +244,15 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
                                         draggingIndexes.clear();
                                       });
 
-                                      if (droppedCard != null &&
+                                      if (droppedCards.isNotEmpty &&
                                           widget.onCardDropped != null) {
                                         widget.onCardDropped!(
-                                          droppedCard,
+                                          droppedCards,
                                           dropPosition,
                                         );
                                       }
+
+                                      widget.onCardDragEnded?.call();
                                     }
                                   : null,
 

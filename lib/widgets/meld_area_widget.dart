@@ -11,6 +11,9 @@ class MeldAreaWidget extends StatelessWidget {
   /// Allows GameScreen to know where this widget is.
   final GlobalKey? areaKey;
   final List<GlobalKey>? meldKeys;
+  final List<List<GlobalKey>>? meldCardKeys;
+  final int? hoveredMeldIndex;
+  final int? hoveredInsertionIndex;
   final Function(int)? onMeldTapped;
   final VoidCallback? onAreaTapped;
 
@@ -21,6 +24,9 @@ class MeldAreaWidget extends StatelessWidget {
     this.borderColor = Colors.white54,
     this.areaKey,
     this.meldKeys,
+    this.meldCardKeys,
+    this.hoveredMeldIndex,
+    this.hoveredInsertionIndex,
     this.onMeldTapped,
     this.onAreaTapped,
   });
@@ -67,14 +73,38 @@ class MeldAreaWidget extends StatelessWidget {
                         ...melds.asMap().entries.map(
                           (entry) => Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: MeldWidget(
-                              key: meldKeys != null
-                                  ? meldKeys![entry.key]
-                                  : null,
-                              meld: entry.value,
-                              onTap: onMeldTapped == null
-                                  ? null
-                                  : () => onMeldTapped!(entry.key),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 150),
+                              decoration: BoxDecoration(
+                                color: hoveredMeldIndex == entry.key
+                                    ? Colors.lightGreenAccent.withValues(
+                                        alpha: 0.45,
+                                      )
+                                    : Colors.transparent,
+                                border: Border.all(
+                                  color: hoveredMeldIndex == entry.key
+                                      ? Colors.green.shade900
+                                      : Colors.transparent,
+                                  width: 3,
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: MeldWidget(
+                                meldKey: meldKeys != null
+                                    ? meldKeys![entry.key]
+                                    : null,
+                                meld: entry.value,
+                                cardKeys: meldCardKeys != null
+                                    ? meldCardKeys![entry.key]
+                                    : null,
+                                previewInsertionIndex:
+                                    hoveredMeldIndex == entry.key
+                                    ? hoveredInsertionIndex
+                                    : null,
+                                onTap: onMeldTapped == null
+                                    ? null
+                                    : () => onMeldTapped!(entry.key),
+                              ),
                             ),
                           ),
                         ),

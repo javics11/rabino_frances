@@ -1,15 +1,12 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 
-import '../models/card.dart';
 import '../models/game.dart';
-import '../models/meld.dart';
-import '../models/deck.dart';
-import '../models/player.dart';
-import '../models/spanish_suit.dart';
+import '../services/game_factory.dart';
 import '../widgets/player_hand_widget.dart';
 import '../widgets/meld_area_widget.dart';
+import '../services/drag_drop_service.dart';
+import '../services/game_service.dart';
+import '../services/ai_service.dart';
 
 class GameScreen extends StatefulWidget {
   final Game game;
@@ -23,157 +20,100 @@ class GameScreen extends StatefulWidget {
 class _GameScreenState extends State<GameScreen> {
   final Set<int> selectedCardIndexes = {};
 
-  List<CardModel> discardPile = [];
+  late GameService gameService;
+  late AiService aiService;
   final GlobalKey discardPileKey = GlobalKey();
+
   final GlobalKey aiMeldAreaKey = GlobalKey();
   final GlobalKey playerMeldAreaKey = GlobalKey();
   final List<GlobalKey> playerMeldKeys = [];
+  final List<List<GlobalKey>> playerMeldCardKeys = [];
+  int? hoveredMeldIndex;
+  int? hoveredInsertionIndex;
 
-  //=========================================================
-  // SORT BY RANK
-  //=========================================================
+  @override
+  void initState() {
+    super.initState();
+
+    gameService = GameService(game: widget.game);
+
+    aiService = AiService(game: widget.game);
+  }
 
   void _sortByRank() {
-    final player = widget.game.players.first;
-
-    while (playerMeldKeys.length < player.melds.length) {
-      playerMeldKeys.add(GlobalKey());
-    }
-
-    while (playerMeldKeys.length > player.melds.length) {
-      playerMeldKeys.removeLast();
-    }
-
-    int rankValue(CardModel card) {
-      if (card.isJoker) return 100;
-
-      switch (card.rank) {
-        case 13:
-          return 90; // K
-        case 12:
-          return 80; // Q
-        case 11:
-          return 70; // J
-        case 10:
-          return 60;
-        case 9:
-          return 50;
-        case 8:
-          return 40;
-        case 7:
-          return 30;
-        case 6:
-          return 20;
-        case 5:
-          return 19;
-        case 4:
-          return 18;
-        case 3:
-          return 17;
-        case 2:
-          return 16;
-        case 1:
-          return 0; // Ace
-        default:
-          return 0;
-      }
-    }
-
     setState(() {
-      player.hand.sort((a, b) => rankValue(b).compareTo(rankValue(a)));
+      gameService.sortCurrentPlayerByRank();
     });
   }
 
-  //=========================================================
-  // SORT BY SUIT
-  //=========================================================
-
   void _sortBySuit() {
-    final player = widget.game.players.first;
-
-    int suitValue(SpanishSuit? suit) {
-      switch (suit) {
-        case SpanishSuit.bastos:
-          return 0;
-        case SpanishSuit.copas:
-          return 1;
-        case SpanishSuit.espadas:
-          return 2;
-        case SpanishSuit.oros:
-          return 3;
-        default:
-          return 4;
-      }
-    }
-
-    int rankValue(CardModel card) {
-      if (card.isJoker) return 100;
-
-      switch (card.rank) {
-        case 13:
-          return 90; // K
-        case 12:
-          return 80; // Q
-        case 11:
-          return 70; // J
-        case 10:
-          return 60;
-        case 9:
-          return 50;
-        case 8:
-          return 40;
-        case 7:
-          return 30;
-        case 6:
-          return 20;
-        case 5:
-          return 19;
-        case 4:
-          return 18;
-        case 3:
-          return 17;
-        case 2:
-          return 16;
-        case 1:
-          return 0; // Ace
-        default:
-          return 0;
-      }
-    }
-
     setState(() {
-      player.hand.sort((a, b) {
-        // Jokers always first
-        if (a.isJoker && !b.isJoker) return -1;
-        if (!a.isJoker && b.isJoker) return 1;
-        if (a.isJoker && b.isJoker) return 0;
-
-        // First compare suits
-        final suitCompare = suitValue(a.suit).compareTo(suitValue(b.suit));
-
-        if (suitCompare != 0) {
-          return suitCompare;
-        }
-
-        // Same suit -> highest rank first
-        return rankValue(b).compareTo(rankValue(a));
-      });
+      gameService.sortCurrentPlayerBySuit();
     });
   }
 
   void _newGame() {
-    final deck = Deck();
-
-    deck.shuffle();
-
-    final newGame = Game(deck: deck, players: [Player("You"), Player("AI")]);
-
-    newGame.dealCards();
+    final newGame = GameFactory.createNewGame();
 
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => GameScreen(game: newGame)),
     );
+  }
+
+  void _updateHoveredMeld(Offset position) {
+    final dropResult = DragDropService.findDropTarget(
+      position: position,
+      discardPileKey: discardPileKey,
+      meldAreaKey: playerMeldAreaKey,
+      meldKeys: playerMeldKeys,
+      meldCardKeys: playerMeldCardKeys,
+    );
+
+    int? newHoveredMeldIndex;
+    int? newInsertionIndex;
+
+    if (dropResult.type == DropTargetType.existingMeld) {
+      newHoveredMeldIndex = dropResult.meldIndex;
+
+      final meldRect = DragDropService.getGlobalRect(
+        playerMeldKeys[newHoveredMeldIndex!],
+      );
+
+      if (meldRect != null) {
+        final cardCount =
+            widget.game.players.first.melds[newHoveredMeldIndex].cards.length;
+
+        newInsertionIndex = 0;
+
+        for (int index = 0; index < cardCount; index++) {
+          final cardCentreX = meldRect.left + 40 + index * 60;
+
+          if (position.dx >= cardCentreX) {
+            newInsertionIndex = index + 1;
+          } else {
+            break;
+          }
+        }
+      }
+    }
+
+    if (hoveredMeldIndex != newHoveredMeldIndex ||
+        hoveredInsertionIndex != newInsertionIndex) {
+      setState(() {
+        hoveredMeldIndex = newHoveredMeldIndex;
+        hoveredInsertionIndex = newInsertionIndex;
+      });
+    }
+  }
+
+  void _clearHoveredMeld() {
+    if (hoveredMeldIndex != null || hoveredInsertionIndex != null) {
+      setState(() {
+        hoveredMeldIndex = null;
+        hoveredInsertionIndex = null;
+      });
+    }
   }
 
   @override
@@ -187,6 +127,27 @@ class _GameScreenState extends State<GameScreen> {
 
     while (playerMeldKeys.length > player.melds.length) {
       playerMeldKeys.removeLast();
+    }
+
+    while (playerMeldCardKeys.length < player.melds.length) {
+      playerMeldCardKeys.add([]);
+    }
+
+    while (playerMeldCardKeys.length > player.melds.length) {
+      playerMeldCardKeys.removeLast();
+    }
+
+    for (int meldIndex = 0; meldIndex < player.melds.length; meldIndex++) {
+      final cardKeys = playerMeldCardKeys[meldIndex];
+      final cardCount = player.melds[meldIndex].cards.length;
+
+      while (cardKeys.length < cardCount) {
+        cardKeys.add(GlobalKey());
+      }
+
+      while (cardKeys.length > cardCount) {
+        cardKeys.removeLast();
+      }
     }
 
     return Scaffold(
@@ -255,7 +216,10 @@ class _GameScreenState extends State<GameScreen> {
                   MeldAreaWidget(
                     areaKey: playerMeldAreaKey,
                     meldKeys: playerMeldKeys,
+                    meldCardKeys: playerMeldCardKeys,
                     melds: player.melds,
+                    hoveredMeldIndex: hoveredMeldIndex,
+                    hoveredInsertionIndex: hoveredInsertionIndex,
                     emptyText: "MELDS",
 
                     onMeldTapped: (meldIndex) {
@@ -264,17 +228,10 @@ class _GameScreenState extends State<GameScreen> {
                       }
 
                       setState(() {
-                        final selected = selectedCardIndexes.toList()..sort();
-
-                        final cards = selected
-                            .map((i) => player.hand[i])
-                            .toList();
-
-                        for (final index in selected.reversed) {
-                          player.hand.removeAt(index);
-                        }
-
-                        player.melds[meldIndex].cards.addAll(cards);
+                        gameService.addCardsToMeld(
+                          meldIndex,
+                          selectedCardIndexes.toList(),
+                        );
 
                         selectedCardIndexes.clear();
                       });
@@ -285,17 +242,7 @@ class _GameScreenState extends State<GameScreen> {
                       }
 
                       setState(() {
-                        final selected = selectedCardIndexes.toList()..sort();
-
-                        final cards = selected
-                            .map((i) => player.hand[i])
-                            .toList();
-
-                        for (final index in selected.reversed) {
-                          player.hand.removeAt(index);
-                        }
-
-                        player.melds.add(Meld(cards: cards));
+                        gameService.createMeld(selectedCardIndexes.toList());
 
                         selectedCardIndexes.clear();
                       });
@@ -367,111 +314,99 @@ class _GameScreenState extends State<GameScreen> {
                 });
               },
 
-              onCardDropped: (card, position) {
-                final renderBox =
-                    discardPileKey.currentContext!.findRenderObject()
-                        as RenderBox;
+              onCardDragUpdated: _updateHoveredMeld,
+              onCardDragEnded: _clearHoveredMeld,
 
-                final discardTopLeft = renderBox.localToGlobal(Offset.zero);
+              onCardDropped: (draggedCards, position) {
+                final handIndexes = <int>[];
 
-                final discardRect = discardTopLeft & renderBox.size;
-
-                final meldRenderBox =
-                    playerMeldAreaKey.currentContext!.findRenderObject()
-                        as RenderBox;
-
-                final meldTopLeft = meldRenderBox.localToGlobal(Offset.zero);
-
-                final meldRect = meldTopLeft & meldRenderBox.size;
-
-                if (discardRect.contains(position)) {
-                  setState(() {
-                    final index = player.hand.indexWhere(
-                      (c) => c.id == card.id,
-                    );
-
-                    if (index != -1 &&
-                        widget.game.canDiscard() &&
-                        widget.game.currentPlayerIndex == 0) {
-                      discardPile.add(player.hand.removeAt(index));
-
-                      selectedCardIndexes.clear();
-
-                      widget.game.endTurn();
-
-                      _playAiTurn();
-                    }
-                  });
-                }
-
-                // ------------------------------------------------------------
-                // First check whether the cards were dropped on an existing meld.
-                // ------------------------------------------------------------
-                for (int i = 0; i < playerMeldKeys.length; i++) {
-                  final renderBox =
-                      playerMeldKeys[i].currentContext?.findRenderObject()
-                          as RenderBox?;
-
-                  if (renderBox == null) {
-                    continue;
-                  }
-
-                  final topLeft = renderBox.localToGlobal(Offset.zero);
-                  print("Meld $i");
-                  print("TopLeft: $topLeft");
-                  print("Size: ${renderBox.size}");
-                  final rect = Rect.fromLTWH(
-                    topLeft.dx - 15,
-                    topLeft.dy - 15,
-                    renderBox.size.width + 30,
-                    renderBox.size.height + 30,
+                for (final draggedCard in draggedCards) {
+                  final index = player.hand.indexWhere(
+                    (card) => card.id == draggedCard.id,
                   );
 
-                  print("-----------");
-                  print("Drop: $position");
-                  print("Rect: $rect");
-                  print("Contains: ${rect.contains(position)}");
-
-                  if (rect.contains(position)) {
-                    print("Matched meld $i");
-                    setState(() {
-                      final selectedCards = selectedCardIndexes.toList()
-                        ..sort();
-
-                      final cards = selectedCards
-                          .map((i) => player.hand[i])
-                          .toList();
-
-                      for (final index in selectedCards.reversed) {
-                        player.hand.removeAt(index);
-                      }
-
-                      player.melds[i].cards.addAll(cards);
-                      print("Cards in meld after append:");
-                      for (final c in player.melds[i].cards) {
-                        print(c.shortDisplay);
-                      }
-
-                      selectedCardIndexes.clear();
-                    });
-
+                  if (index == -1) {
                     return;
                   }
+
+                  handIndexes.add(index);
                 }
-                print("No existing meld matched.");
-                if (meldRect.contains(position)) {
+
+                final dropResult = DragDropService.findDropTarget(
+                  position: position,
+                  discardPileKey: discardPileKey,
+                  meldAreaKey: playerMeldAreaKey,
+                  meldKeys: playerMeldKeys,
+                  meldCardKeys: playerMeldCardKeys,
+                );
+
+                if (dropResult.type == DropTargetType.discardPile) {
                   setState(() {
-                    final selectedCards = selectedCardIndexes.toList()..sort();
-
-                    final newMeld = selectedCards
-                        .map((i) => player.hand[i])
-                        .toList();
-
-                    player.melds.add(Meld(cards: newMeld));
-
-                    for (final i in selectedCards.reversed) {
-                      player.hand.removeAt(i);
+                    if (widget.game.canDiscard() &&
+                        widget.game.currentPlayerIndex == 0) {
+                      if (draggedCards.length == 1 &&
+                          gameService.discardCard(draggedCards.first)) {
+                        selectedCardIndexes.clear();
+                        _playAiTurn();
+                      }
                     }
+                  });
+
+                  return;
+                }
+
+                // ------------------------------------------------------------
+                // Check whether the card was dropped on an existing meld.
+                // ------------------------------------------------------------
+                final previewMeldIndex = hoveredMeldIndex;
+                final previewInsertionIndex = hoveredInsertionIndex;
+
+                bool isInsidePreviewMeld = false;
+
+                if (previewMeldIndex != null &&
+                    previewInsertionIndex != null &&
+                    previewMeldIndex < playerMeldKeys.length) {
+                  final meldRect = DragDropService.getGlobalRect(
+                    playerMeldKeys[previewMeldIndex],
+                  );
+
+                  if (meldRect != null) {
+                    final expandedRect = DragDropService.expandRect(
+                      meldRect,
+                      15,
+                    );
+
+                    isInsidePreviewMeld = expandedRect.contains(position);
+                  }
+                }
+
+                if (isInsidePreviewMeld ||
+                    dropResult.type == DropTargetType.existingMeld) {
+                  final meldIndex = isInsidePreviewMeld
+                      ? previewMeldIndex!
+                      : dropResult.meldIndex!;
+
+                  final insertionIndex = isInsidePreviewMeld
+                      ? previewInsertionIndex!
+                      : dropResult.insertionIndex;
+
+                  setState(() {
+                    final success = gameService.addCardsToMeld(
+                      meldIndex,
+                      handIndexes,
+                      insertionIndex: insertionIndex,
+                    );
+
+                    if (success) {
+                      selectedCardIndexes.clear();
+                    }
+                  });
+
+                  return;
+                }
+                if (dropResult.type == DropTargetType.meldArea) {
+                  setState(() {
+                    gameService.createMeld(handIndexes);
 
                     selectedCardIndexes.clear();
                   });
@@ -494,7 +429,7 @@ class _GameScreenState extends State<GameScreen> {
           ? null
           : () {
               setState(() {
-                widget.game.drawCard();
+                gameService.drawFromDeck();
               });
             },
       child: Container(
@@ -529,25 +464,21 @@ class _GameScreenState extends State<GameScreen> {
               widget.game.canDiscard() &&
               widget.game.currentPlayerIndex == 0) {
             final index = selectedCardIndexes.first;
+            final card = player.hand[index];
 
-            discardPile.add(player.hand.removeAt(index));
+            if (gameService.discardCard(card)) {
+              selectedCardIndexes.clear();
 
-            selectedCardIndexes.clear();
-
-            widget.game.endTurn();
-
-            _playAiTurn();
+              _playAiTurn();
+            }
 
             return;
           }
 
           if (selectedCardIndexes.isEmpty &&
-              discardPile.isNotEmpty &&
               widget.game.currentPlayerIndex == 0 &&
               widget.game.canDraw()) {
-            player.hand.add(discardPile.removeLast());
-
-            widget.game.hasDrawnThisTurn = true;
+            gameService.drawFromDiscard();
           }
         });
       },
@@ -559,7 +490,7 @@ class _GameScreenState extends State<GameScreen> {
           borderRadius: BorderRadius.circular(10),
         ),
         child: Center(
-          child: discardPile.isEmpty
+          child: widget.game.discardPile.isEmpty
               ? const Text(
                   'DISCARD',
                   style: TextStyle(
@@ -568,7 +499,7 @@ class _GameScreenState extends State<GameScreen> {
                   ),
                 )
               : Text(
-                  discardPile.last.shortDisplay,
+                  widget.game.discardPile.last.shortDisplay,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: Colors.white,
@@ -586,19 +517,7 @@ class _GameScreenState extends State<GameScreen> {
       if (!mounted) return;
 
       setState(() {
-        if (!widget.game.firstTurnOfRound) {
-          widget.game.drawCard();
-        }
-
-        if (widget.game.currentPlayer.hand.isNotEmpty) {
-          final random = Random();
-
-          final index = random.nextInt(widget.game.currentPlayer.hand.length);
-
-          discardPile.add(widget.game.currentPlayer.hand.removeAt(index));
-        }
-
-        widget.game.endTurn();
+        aiService.playTurn();
       });
     });
   }
