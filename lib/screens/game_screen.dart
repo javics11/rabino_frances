@@ -247,6 +247,22 @@ class _GameScreenState extends State<GameScreen> {
                         selectedCardIndexes.clear();
                       });
                     },
+                    onMeldCardDragUpdated: (_, position) =>
+                        _updateHoveredMeld(position),
+                    onMeldCardDropped: (meldIndex, card, position) {
+                      final targetMeld = hoveredMeldIndex;
+                      final insertionIndex = hoveredInsertionIndex;
+                      if (targetMeld == meldIndex && insertionIndex != null) {
+                        setState(() {
+                          gameService.reorderMeldCard(
+                            meldIndex,
+                            card.id,
+                            insertionIndex,
+                          );
+                        });
+                      }
+                    },
+                    onMeldCardDragEnded: _clearHoveredMeld,
                   ),
                 ],
               ),

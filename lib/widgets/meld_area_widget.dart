@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/meld.dart';
 import 'meld_widget.dart';
+import '../models/card.dart';
 
 class MeldAreaWidget extends StatelessWidget {
   final List<Meld> melds;
@@ -16,6 +17,9 @@ class MeldAreaWidget extends StatelessWidget {
   final int? hoveredInsertionIndex;
   final Function(int)? onMeldTapped;
   final VoidCallback? onAreaTapped;
+  final void Function(int, Offset)? onMeldCardDragUpdated;
+  final void Function(int, CardModel, Offset)? onMeldCardDropped;
+  final VoidCallback? onMeldCardDragEnded;
 
   const MeldAreaWidget({
     super.key,
@@ -29,6 +33,9 @@ class MeldAreaWidget extends StatelessWidget {
     this.hoveredInsertionIndex,
     this.onMeldTapped,
     this.onAreaTapped,
+    this.onMeldCardDragUpdated,
+    this.onMeldCardDropped,
+    this.onMeldCardDragEnded,
   });
 
   @override
@@ -104,6 +111,15 @@ class MeldAreaWidget extends StatelessWidget {
                                 onTap: onMeldTapped == null
                                     ? null
                                     : () => onMeldTapped!(entry.key),
+                                onCardDragUpdated: onMeldCardDragUpdated == null
+                                    ? null
+                                    : (cardIndex, position) =>
+                                        onMeldCardDragUpdated!(entry.key, position),
+                                onCardDropped: onMeldCardDropped == null
+                                    ? null
+                                    : (cardIndex, card, position) =>
+                                        onMeldCardDropped!(entry.key, card, position),
+                                onCardDragEnded: onMeldCardDragEnded,
                               ),
                             ),
                           ),
