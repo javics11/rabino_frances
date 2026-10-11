@@ -18,7 +18,7 @@ class MeldAreaWidget extends StatelessWidget {
   final Function(int)? onMeldTapped;
   final VoidCallback? onAreaTapped;
   final void Function(int, Offset)? onMeldCardDragUpdated;
-  final void Function(int, CardModel, Offset)? onMeldCardDropped;
+  final void Function(int, CardModel, Offset, int)? onMeldCardDropped;
   final VoidCallback? onMeldCardDragEnded;
 
   const MeldAreaWidget({
@@ -117,8 +117,8 @@ class MeldAreaWidget extends StatelessWidget {
                                         onMeldCardDragUpdated!(entry.key, position),
                                 onCardDropped: onMeldCardDropped == null
                                     ? null
-                                    : (cardIndex, card, position) =>
-                                        onMeldCardDropped!(entry.key, card, position),
+                                    : (cardIndex, card, position, insertionIndex) =>
+                                        onMeldCardDropped!(entry.key, card, position, insertionIndex),
                                 onCardDragEnded: onMeldCardDragEnded,
                               ),
                             ),

@@ -300,6 +300,18 @@ void main() {
     expect(game.currentPlayer.melds.first.cards, [middle, last, first]);
   });
 
+  test('Reorder insertion index is interpreted before source removal', () {
+    final first = game.deck.cards.removeLast();
+    final middle = game.deck.cards.removeLast();
+    final last = game.deck.cards.removeLast();
+    game.currentPlayer.melds.add(Meld(cards: [first, middle, last]));
+
+    expect(gameService.reorderMeldCard(0, last.id, 0), isTrue);
+    expect(game.currentPlayer.melds.first.cards, [last, first, middle]);
+    expect(gameService.reorderMeldCard(0, last.id, 3), isTrue);
+    expect(game.currentPlayer.melds.first.cards, [first, middle, last]);
+  });
+
   test('Rejects reordering into a different meld and preserves both melds', () {
     final first = game.deck.cards.removeLast();
     final second = game.deck.cards.removeLast();

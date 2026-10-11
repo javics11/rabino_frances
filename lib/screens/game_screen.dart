@@ -30,6 +30,7 @@ class _GameScreenState extends State<GameScreen> {
   final List<List<GlobalKey>> playerMeldCardKeys = [];
   int? hoveredMeldIndex;
   int? hoveredInsertionIndex;
+  int? draggingMeldIndex;
 
   @override
   void initState() {
@@ -76,13 +77,19 @@ class _GameScreenState extends State<GameScreen> {
     if (dropResult.type == DropTargetType.existingMeld) {
       newHoveredMeldIndex = dropResult.meldIndex;
 
-      final meldRect = DragDropService.getGlobalRect(
-        playerMeldKeys[newHoveredMeldIndex!],
-      );
+      if (draggingMeldIndex != null &&
+          newHoveredMeldIndex != draggingMeldIndex) {
+        newHoveredMeldIndex = null;
+      }
 
-      if (meldRect != null) {
+      final hoveredIndex = newHoveredMeldIndex;
+      final meldRect = hoveredIndex == null
+          ? null
+          : DragDropService.getGlobalRect(playerMeldKeys[hoveredIndex]);
+
+      if (meldRect != null && hoveredIndex != null) {
         final cardCount =
-            widget.game.players.first.melds[newHoveredMeldIndex].cards.length;
+            widget.game.players.first.melds[hoveredIndex].cards.length;
 
         newInsertionIndex = 0;
 
@@ -108,10 +115,13 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _clearHoveredMeld() {
-    if (hoveredMeldIndex != null || hoveredInsertionIndex != null) {
+    if (hoveredMeldIndex != null ||
+        hoveredInsertionIndex != null ||
+        draggingMeldIndex != null) {
       setState(() {
         hoveredMeldIndex = null;
         hoveredInsertionIndex = null;
+        draggingMeldIndex = null;
       });
     }
   }
@@ -247,21 +257,33 @@ class _GameScreenState extends State<GameScreen> {
                         selectedCardIndexes.clear();
                       });
                     },
-                    onMeldCardDragUpdated: (_, position) =>
-                        _updateHoveredMeld(position),
-                    onMeldCardDropped: (meldIndex, card, position) {
-                      final targetMeld = hoveredMeldIndex;
-                      final insertionIndex = hoveredInsertionIndex;
-                      if (targetMeld == meldIndex && insertionIndex != null) {
-                        setState(() {
-                          gameService.reorderMeldCard(
-                            meldIndex,
-                            card.id,
-                            insertionIndex,
-                          );
-                        });
-                      }
+                    onMeldCardDragUpdated: (meldIndex, position) {
+                      draggingMeldIndex ??= meldIndex;
+                      _updateHoveredMeld(position);
                     },
+                    onMeldCardDropped:
+                        (meldIndex, card, position, insertionIndex) {
+                          final meldRect = DragDropService.getGlobalRect(
+                            playerMeldKeys[meldIndex],
+                          );
+                          final isInsideOriginalMeld =
+                              meldRect != null &&
+                              DragDropService.expandRect(
+                                meldRect,
+                                15,
+                              ).contains(position);
+
+                          if (isInsideOriginalMeld &&
+                              hoveredMeldIndex == meldIndex) {
+                            setState(() {
+                              gameService.reorderMeldCard(
+                                meldIndex,
+                                card.id,
+                                insertionIndex,
+                              );
+                            });
+                          }
+                        },
                     onMeldCardDragEnded: _clearHoveredMeld,
                   ),
                 ],
@@ -330,7 +352,10 @@ class _GameScreenState extends State<GameScreen> {
                 });
               },
 
-              onCardDragUpdated: _updateHoveredMeld,
+              onCardDragUpdated: (position) {
+                draggingMeldIndex = null;
+                _updateHoveredMeld(position);
+              },
               onCardDragEnded: _clearHoveredMeld,
 
               onCardDropped: (draggedCards, position) {

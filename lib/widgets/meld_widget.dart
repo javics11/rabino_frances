@@ -11,7 +11,7 @@ class MeldWidget extends StatefulWidget {
   final List<GlobalKey>? cardKeys;
   final int? previewInsertionIndex;
   final void Function(int, Offset)? onCardDragUpdated;
-  final void Function(int, CardModel, Offset)? onCardDropped;
+  final void Function(int, CardModel, Offset, int)? onCardDropped;
   final VoidCallback? onCardDragEnded;
 
   const MeldWidget({
@@ -111,7 +111,7 @@ class _MeldWidgetState extends State<MeldWidget> {
                     : (_) => _finishDrag(index),
                 onPanCancel: widget.onCardDropped == null
                     ? null
-                    : () => _finishDrag(index),
+                    : _cancelDrag,
                 child: AnimatedScale(
                   duration: const Duration(milliseconds: 120),
                   scale: cardIsDragging ? 1.08 : 1.0,
@@ -150,12 +150,22 @@ class _MeldWidgetState extends State<MeldWidget> {
 
   void _finishDrag(int index) {
     final card = widget.meld.cards[index];
-    widget.onCardDropped!(index, card, fingerPosition);
+    final insertionIndex = _calculateGapIndex();
+    widget.onCardDropped!(index, card, fingerPosition, insertionIndex);
+    _resetDrag();
+    widget.onCardDragEnded?.call();
+  }
+
+  void _cancelDrag() {
+    _resetDrag();
+    widget.onCardDragEnded?.call();
+  }
+
+  void _resetDrag() {
     setState(() {
       draggingIndex = null;
       dragOffset = Offset.zero;
       fingerPosition = Offset.zero;
     });
-    widget.onCardDragEnded?.call();
   }
 }
