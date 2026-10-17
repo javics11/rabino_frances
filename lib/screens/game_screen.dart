@@ -7,6 +7,7 @@ import '../widgets/meld_area_widget.dart';
 import '../services/drag_drop_service.dart';
 import '../services/game_service.dart';
 import '../services/ai_service.dart';
+import '../rules/rabino_rules.dart';
 
 class GameScreen extends StatefulWidget {
   final Game game;
@@ -30,6 +31,7 @@ class _GameScreenState extends State<GameScreen> {
   final List<List<GlobalKey>> playerMeldCardKeys = [];
   int? hoveredMeldIndex;
   int? hoveredInsertionIndex;
+  int? newMeldInsertionIndex;
   int? draggingMeldIndex;
 
   @override
@@ -73,6 +75,7 @@ class _GameScreenState extends State<GameScreen> {
 
     int? newHoveredMeldIndex;
     int? newInsertionIndex;
+    int? newMeldIndex;
 
     if (dropResult.type == DropTargetType.existingMeld) {
       newHoveredMeldIndex = dropResult.meldIndex;
@@ -81,35 +84,17 @@ class _GameScreenState extends State<GameScreen> {
           newHoveredMeldIndex != draggingMeldIndex) {
         newHoveredMeldIndex = null;
       }
-
-      final hoveredIndex = newHoveredMeldIndex;
-      final meldRect = hoveredIndex == null
-          ? null
-          : DragDropService.getGlobalRect(playerMeldKeys[hoveredIndex]);
-
-      if (meldRect != null && hoveredIndex != null) {
-        final cardCount =
-            widget.game.players.first.melds[hoveredIndex].cards.length;
-
-        newInsertionIndex = 0;
-
-        for (int index = 0; index < cardCount; index++) {
-          final cardCentreX = meldRect.left + 40 + index * 60;
-
-          if (position.dx >= cardCentreX) {
-            newInsertionIndex = index + 1;
-          } else {
-            break;
-          }
-        }
-      }
+    } else if (dropResult.type == DropTargetType.meldArea) {
+      newMeldIndex = _newMeldIndexForPosition(position);
     }
 
     if (hoveredMeldIndex != newHoveredMeldIndex ||
-        hoveredInsertionIndex != newInsertionIndex) {
+        hoveredInsertionIndex != newInsertionIndex ||
+        newMeldInsertionIndex != newMeldIndex) {
       setState(() {
         hoveredMeldIndex = newHoveredMeldIndex;
         hoveredInsertionIndex = newInsertionIndex;
+        newMeldInsertionIndex = newMeldIndex;
       });
     }
   }
@@ -117,13 +102,28 @@ class _GameScreenState extends State<GameScreen> {
   void _clearHoveredMeld() {
     if (hoveredMeldIndex != null ||
         hoveredInsertionIndex != null ||
+        newMeldInsertionIndex != null ||
         draggingMeldIndex != null) {
       setState(() {
         hoveredMeldIndex = null;
         hoveredInsertionIndex = null;
+        newMeldInsertionIndex = null;
         draggingMeldIndex = null;
       });
     }
+  }
+
+  void _showMeldRejection({MeldArrangementStatus? status}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          status == MeldArrangementStatus.ambiguous
+              ? 'La combinación tiene varias opciones válidas. Ordena las cartas para indicar cómo quieres jugarla.'
+              : 'La combinación no es válida.',
+        ),
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -230,32 +230,78 @@ class _GameScreenState extends State<GameScreen> {
                     melds: player.melds,
                     hoveredMeldIndex: hoveredMeldIndex,
                     hoveredInsertionIndex: hoveredInsertionIndex,
+                    newMeldInsertionIndex: newMeldInsertionIndex,
                     emptyText: "MELDS",
 
-                    onMeldTapped: (meldIndex) {
+                    onMeldTapped: (meldIndex, position) {
                       if (selectedCardIndexes.isEmpty) {
                         return;
                       }
 
+                      final result = gameService.resolveAddCardsToMeld(
+                        meldIndex,
+                        selectedCardIndexes.toList(),
+                      );
+                      if (result == null || !result.isValid) {
+                        _showMeldRejection();
+                        return;
+                      }
+
+                      MeldAdditionAlternative? alternative;
+                      if (result.isUnique) {
+                        alternative = result.alternatives.single;
+                      } else {
+                        final meldRect = DragDropService.getGlobalRect(
+                          playerMeldKeys[meldIndex],
+                        );
+                        if (meldRect != null) {
+                          alternative =
+                              gameService.selectMeldAdditionAlternative(
+                            meldIndex,
+                            result,
+                            position.dx < meldRect.center.dx,
+                          );
+                        }
+                      }
+                      if (alternative == null) {
+                        _showMeldRejection();
+                        return;
+                      }
+
+                      var success = false;
                       setState(() {
-                        gameService.addCardsToMeld(
+                        success = gameService.applyMeldAddition(
                           meldIndex,
                           selectedCardIndexes.toList(),
+                          alternative!,
                         );
 
-                        selectedCardIndexes.clear();
+                        if (success) selectedCardIndexes.clear();
                       });
+                      if (!success) _showMeldRejection();
                     },
-                    onAreaTapped: () {
+                    onAreaTapped: (position) {
                       if (selectedCardIndexes.isEmpty) {
                         return;
                       }
 
+                      final insertionIndex =
+                          _newMeldIndexForPosition(position);
+                      var success = false;
+                      MeldArrangementStatus? failureStatus;
                       setState(() {
-                        gameService.createMeld(selectedCardIndexes.toList());
+                        final result = gameService.createMeldResult(
+                          selectedCardIndexes.toList(),
+                          insertionIndex: insertionIndex,
+                        );
+                        success = result.success;
+                        failureStatus = result.status;
 
-                        selectedCardIndexes.clear();
+                        if (success) selectedCardIndexes.clear();
                       });
+                      if (!success) {
+                        _showMeldRejection(status: failureStatus);
+                      }
                     },
                     onMeldCardDragUpdated: (meldIndex, position) {
                       draggingMeldIndex ??= meldIndex;
@@ -396,61 +442,68 @@ class _GameScreenState extends State<GameScreen> {
                   return;
                 }
 
-                // ------------------------------------------------------------
-                // Check whether the card was dropped on an existing meld.
-                // ------------------------------------------------------------
-                final previewMeldIndex = hoveredMeldIndex;
-                final previewInsertionIndex = hoveredInsertionIndex;
-
-                bool isInsidePreviewMeld = false;
-
-                if (previewMeldIndex != null &&
-                    previewInsertionIndex != null &&
-                    previewMeldIndex < playerMeldKeys.length) {
-                  final meldRect = DragDropService.getGlobalRect(
-                    playerMeldKeys[previewMeldIndex],
+                if (dropResult.type == DropTargetType.existingMeld) {
+                  final meldIndex = dropResult.meldIndex!;
+                  final result = gameService.resolveAddCardsToMeld(
+                    meldIndex,
+                    handIndexes,
                   );
-
-                  if (meldRect != null) {
-                    final expandedRect = DragDropService.expandRect(
-                      meldRect,
-                      15,
-                    );
-
-                    isInsidePreviewMeld = expandedRect.contains(position);
+                  if (result == null || !result.isValid) {
+                    _showMeldRejection();
+                    return;
                   }
-                }
 
-                if (isInsidePreviewMeld ||
-                    dropResult.type == DropTargetType.existingMeld) {
-                  final meldIndex = isInsidePreviewMeld
-                      ? previewMeldIndex!
-                      : dropResult.meldIndex!;
+                  MeldAdditionAlternative? alternative;
+                  if (result.isUnique) {
+                    alternative = result.alternatives.single;
+                  } else if (result.alternatives.length == 2) {
+                    final meldRect = DragDropService.getGlobalRect(
+                      playerMeldKeys[meldIndex],
+                    );
+                    if (meldRect != null) {
+                      alternative = gameService.selectMeldAdditionAlternative(
+                        meldIndex,
+                        result,
+                        position.dx < meldRect.center.dx,
+                      );
+                    }
+                  }
+                  if (alternative == null) {
+                    _showMeldRejection();
+                    return;
+                  }
 
-                  final insertionIndex = isInsidePreviewMeld
-                      ? previewInsertionIndex!
-                      : dropResult.insertionIndex;
-
+                  var success = false;
                   setState(() {
-                    final success = gameService.addCardsToMeld(
+                    success = gameService.applyMeldAddition(
                       meldIndex,
                       handIndexes,
-                      insertionIndex: insertionIndex,
+                      alternative!,
                     );
-
-                    if (success) {
-                      selectedCardIndexes.clear();
-                    }
+                    if (success) selectedCardIndexes.clear();
                   });
-
+                  if (!success) _showMeldRejection();
                   return;
                 }
                 if (dropResult.type == DropTargetType.meldArea) {
+                  // The preview is only visual state. Use the final callback
+                  // position as the source of truth for the committed index.
+                  final insertionIndex = _newMeldIndexForPosition(position);
+                  var success = false;
+                  MeldArrangementStatus? failureStatus;
                   setState(() {
-                    gameService.createMeld(handIndexes);
+                    final result = gameService.createMeldResult(
+                      handIndexes,
+                      insertionIndex: insertionIndex,
+                    );
+                    success = result.success;
+                    failureStatus = result.status;
 
-                    selectedCardIndexes.clear();
+                    if (success) selectedCardIndexes.clear();
                   });
+                  if (!success) {
+                    _showMeldRejection(status: failureStatus);
+                  }
 
                   return;
                 }
@@ -462,6 +515,16 @@ class _GameScreenState extends State<GameScreen> {
         ],
       ),
     );
+  }
+
+  int _newMeldIndexForPosition(Offset position) {
+    for (int index = 0; index < playerMeldKeys.length; index++) {
+      final rect = DragDropService.getGlobalRect(playerMeldKeys[index]);
+      if (rect != null && position.dx < rect.center.dx) {
+        return index;
+      }
+    }
+    return playerMeldKeys.length;
   }
 
   Widget _buildDrawPile() {

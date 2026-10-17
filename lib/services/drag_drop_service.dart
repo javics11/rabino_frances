@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 enum DropTargetType { none, discardPile, existingMeld, meldArea }
@@ -87,19 +89,44 @@ class DragDropService {
         }
       }
 
-      // Keep the whole-meld target as a fallback.
-      // This allows drops in the gaps or edges of a meld.
-      final meldRect = getGlobalRect(meldKeys[meldIndex]);
+    }
 
-      if (meldRect == null) {
+    // The physical space between adjacent melds is reserved for creating a
+    // new meld. Check it before the forgiving whole-meld hit areas below,
+    // whose 15 px expansion can otherwise overlap this space.
+    for (int meldIndex = 0; meldIndex + 1 < meldKeys.length; meldIndex++) {
+      final leftRect = getGlobalRect(meldKeys[meldIndex]);
+      final rightRect = getGlobalRect(meldKeys[meldIndex + 1]);
+
+      if (leftRect == null ||
+          rightRect == null ||
+          position.dx <= leftRect.right ||
+          position.dx >= rightRect.left) {
         continue;
       }
 
-      final expandedRect = expandRect(meldRect, 15);
+      final verticalGap = leftRect.center.dy;
+      final top = math.max(leftRect.top, rightRect.top);
+      final bottom = math.min(leftRect.bottom, rightRect.bottom);
 
+      if (verticalGap >= top && verticalGap <= bottom &&
+          position.dy >= top && position.dy <= bottom) {
+        final meldAreaRect = getGlobalRect(meldAreaKey);
+        if (meldAreaRect != null && meldAreaRect.contains(position)) {
+          return const DropResult(type: DropTargetType.meldArea);
+        }
+      }
+    }
+
+    for (int meldIndex = 0; meldIndex < meldKeys.length; meldIndex++) {
+      // Keep the whole-meld target as a fallback. This preserves the
+      // forgiving edge tolerance for drops that are not in a real gap.
+      final meldRect = getGlobalRect(meldKeys[meldIndex]);
+      if (meldRect == null) continue;
+
+      final expandedRect = expandRect(meldRect, 15);
       if (expandedRect.contains(position)) {
         final isBeforeMeld = position.dx < meldRect.center.dx;
-
         return DropResult(
           type: DropTargetType.existingMeld,
           meldIndex: meldIndex,

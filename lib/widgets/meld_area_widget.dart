@@ -15,8 +15,9 @@ class MeldAreaWidget extends StatelessWidget {
   final List<List<GlobalKey>>? meldCardKeys;
   final int? hoveredMeldIndex;
   final int? hoveredInsertionIndex;
-  final Function(int)? onMeldTapped;
-  final VoidCallback? onAreaTapped;
+  final int? newMeldInsertionIndex;
+  final void Function(int, Offset)? onMeldTapped;
+  final ValueChanged<Offset>? onAreaTapped;
   final void Function(int, Offset)? onMeldCardDragUpdated;
   final void Function(int, CardModel, Offset, int)? onMeldCardDropped;
   final VoidCallback? onMeldCardDragEnded;
@@ -31,6 +32,7 @@ class MeldAreaWidget extends StatelessWidget {
     this.meldCardKeys,
     this.hoveredMeldIndex,
     this.hoveredInsertionIndex,
+    this.newMeldInsertionIndex,
     this.onMeldTapped,
     this.onAreaTapped,
     this.onMeldCardDragUpdated,
@@ -43,7 +45,9 @@ class MeldAreaWidget extends StatelessWidget {
     return GestureDetector(
       key: areaKey,
       behavior: HitTestBehavior.deferToChild,
-      onTap: onAreaTapped,
+      onTapDown: onAreaTapped == null
+          ? null
+          : (details) => onAreaTapped!(details.globalPosition),
       child: SizedBox(
         height: 120,
         width: double.infinity,
@@ -77,59 +81,74 @@ class MeldAreaWidget extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        ...melds.asMap().entries.map(
-                          (entry) => Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 150),
-                              decoration: BoxDecoration(
-                                color: hoveredMeldIndex == entry.key
-                                    ? Colors.lightGreenAccent.withValues(
-                                        alpha: 0.45,
-                                      )
-                                    : Colors.transparent,
-                                border: Border.all(
-                                  color: hoveredMeldIndex == entry.key
-                                      ? Colors.green.shade900
+                        for (int index = 0; index <= melds.length; index++) ...[
+                          if (newMeldInsertionIndex == index)
+                            const _MeldInsertionIndicator(),
+                          if (index < melds.length)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 150),
+                                decoration: BoxDecoration(
+                                  color: hoveredMeldIndex == index
+                                      ? Colors.lightGreenAccent.withValues(alpha: 0.45)
                                       : Colors.transparent,
-                                  width: 3,
+                                  border: Border.all(
+                                    color: hoveredMeldIndex == index
+                                        ? Colors.green.shade900
+                                        : Colors.transparent,
+                                    width: 3,
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: MeldWidget(
-                                meldKey: meldKeys != null
-                                    ? meldKeys![entry.key]
-                                    : null,
-                                meld: entry.value,
-                                cardKeys: meldCardKeys != null
-                                    ? meldCardKeys![entry.key]
-                                    : null,
-                                previewInsertionIndex:
-                                    hoveredMeldIndex == entry.key
-                                    ? hoveredInsertionIndex
-                                    : null,
-                                onTap: onMeldTapped == null
-                                    ? null
-                                    : () => onMeldTapped!(entry.key),
-                                onCardDragUpdated: onMeldCardDragUpdated == null
-                                    ? null
-                                    : (cardIndex, position) =>
-                                        onMeldCardDragUpdated!(entry.key, position),
-                                onCardDropped: onMeldCardDropped == null
-                                    ? null
-                                    : (cardIndex, card, position, insertionIndex) =>
-                                        onMeldCardDropped!(entry.key, card, position, insertionIndex),
-                                onCardDragEnded: onMeldCardDragEnded,
+                                child: MeldWidget(
+                                  meldKey: meldKeys != null ? meldKeys![index] : null,
+                                  meld: melds[index],
+                                  cardKeys: meldCardKeys != null
+                                      ? meldCardKeys![index]
+                                      : null,
+                                  previewInsertionIndex: hoveredMeldIndex == index
+                                      ? hoveredInsertionIndex
+                                      : null,
+                                  onTap: onMeldTapped == null
+                                      ? null
+                                      : (position) =>
+                                          onMeldTapped!(index, position),
+                                  onCardDragUpdated: null,
+                                  onCardDropped: null,
+                                  onCardDragEnded: null,
+                                ),
                               ),
                             ),
-                          ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MeldInsertionIndicator extends StatelessWidget {
+  const _MeldInsertionIndicator();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 0,
+      height: 96,
+      child: OverflowBox(
+        maxWidth: 4,
+        minWidth: 4,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.lightGreenAccent,
+            borderRadius: BorderRadius.circular(2),
+          ),
         ),
       ),
     );

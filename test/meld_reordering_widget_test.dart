@@ -7,7 +7,6 @@ import 'package:rabino_frances/models/game.dart';
 import 'package:rabino_frances/models/meld.dart';
 import 'package:rabino_frances/models/player.dart';
 import 'package:rabino_frances/services/game_service.dart';
-import 'package:rabino_frances/widgets/meld_area_widget.dart';
 import 'package:rabino_frances/widgets/meld_widget.dart';
 import 'package:rabino_frances/widgets/player_hand_widget.dart';
 
@@ -20,197 +19,42 @@ Widget _testApp(Widget child) {
 }
 
 void main() {
-  testWidgets('cancelling a meld drag preserves its card order', (
+  testWidgets('meld insertion preview does not change meld geometry', (
     tester,
   ) async {
-    final cards = _cards(3);
-    final meld = Meld(cards: List.of(cards));
-    final cardKey = GlobalKey();
-
-    await tester.pumpWidget(
-      _testApp(
-        MeldWidget(
-          meld: meld,
-          cardKeys: [cardKey, GlobalKey(), GlobalKey()],
-          onCardDragUpdated: (_, _) {},
-          onCardDropped: (_, _, _, _) {},
-        ),
-      ),
-    );
-
-    final gesture = await tester.startGesture(
-      tester.getCenter(find.byKey(cardKey)),
-    );
-    await gesture.moveBy(const Offset(120, 0));
-    await gesture.cancel();
-    await tester.pumpAndSettle();
-
-    expect(meld.cards, cards);
-  });
-
-  testWidgets('dropping outside the originating meld preserves its order', (
-    tester,
-  ) async {
-    final cards = _cards(3);
-    final meld = Meld(cards: List.of(cards));
-    final cardKey = GlobalKey();
     final meldKey = GlobalKey();
-
-    await tester.pumpWidget(
-      _testApp(
-        MeldWidget(
-          key: meldKey,
-          meld: meld,
-          cardKeys: [cardKey, GlobalKey(), GlobalKey()],
-          onCardDragUpdated: (_, _) {},
-          onCardDropped: (_, card, position, insertionIndex) {
-            final box = meldKey.currentContext!.findRenderObject() as RenderBox;
-            final rect = box.localToGlobal(Offset.zero) & box.size;
-            if (rect.contains(position)) {
-              final source = meld.cards.indexOf(card);
-              meld.cards.removeAt(source);
-              meld.cards.insert(
-                insertionIndex > source ? insertionIndex - 1 : insertionIndex,
-                card,
-              );
-            }
-          },
-        ),
-      ),
-    );
-
-    final gesture = await tester.startGesture(
-      tester.getCenter(find.byKey(cardKey)),
-    );
-    await gesture.moveBy(const Offset(300, 0));
-    await gesture.up();
-    await tester.pumpAndSettle();
-
-    expect(meld.cards, cards);
-  });
-
-  testWidgets('dropping over a different meld does not transfer cards', (
-    tester,
-  ) async {
-    final firstCards = _cards(2);
-    final secondCards = _cards(2).reversed.toList();
-    final firstMeld = Meld(cards: List.of(firstCards));
-    final secondMeld = Meld(cards: List.of(secondCards));
-    final firstKey = GlobalKey();
-    final secondMeldKey = GlobalKey();
-
-    await tester.pumpWidget(
-      _testApp(
-        MeldAreaWidget(
-          melds: [firstMeld, secondMeld],
-          emptyText: 'MELDS',
-          meldKeys: [GlobalKey(), secondMeldKey],
-          meldCardKeys: [
-            [firstKey, GlobalKey()],
-            [GlobalKey(), GlobalKey()],
-          ],
-          onMeldCardDragUpdated: (_, _) {},
-          onMeldCardDropped: (meldIndex, card, position, insertionIndex) {
-            final secondBox =
-                secondMeldKey.currentContext!.findRenderObject() as RenderBox;
-            final secondRect =
-                secondBox.localToGlobal(Offset.zero) & secondBox.size;
-            if (meldIndex == 0 && !secondRect.contains(position)) {
-              final source = firstMeld.cards.indexOf(card);
-              firstMeld.cards.removeAt(source);
-              firstMeld.cards.insert(
-                insertionIndex > source ? insertionIndex - 1 : insertionIndex,
-                card,
-              );
-            }
-          },
-        ),
-      ),
-    );
-
-    final gesture = await tester.startGesture(
-      tester.getCenter(find.byKey(firstKey)),
-    );
-    await gesture.moveTo(tester.getCenter(find.byKey(secondMeldKey)));
-    await gesture.up();
-    await tester.pumpAndSettle();
-
-    expect(firstMeld.cards, firstCards);
-    expect(secondMeld.cards, secondCards);
-  });
-
-  testWidgets('meld drag updates remain associated with the originating meld', (
-    tester,
-  ) async {
-    final firstMeld = Meld(cards: _cards(2));
-    final secondMeld = Meld(cards: _cards(2).reversed.toList());
-    final firstCardKey = GlobalKey();
-    int? reportedMeldIndex;
-
-    await tester.pumpWidget(
-      _testApp(
-        MeldAreaWidget(
-          melds: [firstMeld, secondMeld],
-          emptyText: 'MELDS',
-          meldKeys: [GlobalKey(), GlobalKey()],
-          meldCardKeys: [
-            [firstCardKey, GlobalKey()],
-            [GlobalKey(), GlobalKey()],
-          ],
-          onMeldCardDragUpdated: (meldIndex, _) {
-            reportedMeldIndex = meldIndex;
-          },
-          onMeldCardDropped: (_, _, _, _) {},
-        ),
-      ),
-    );
-
-    final gesture = await tester.startGesture(
-      tester.getCenter(find.byKey(firstCardKey)),
-    );
-    await gesture.moveBy(const Offset(220, 0));
-    await tester.pump();
-
-    expect(reportedMeldIndex, 0);
-    await gesture.cancel();
-  });
-
-  testWidgets('valid meld drop commits the previewed insertion position', (
-    tester,
-  ) async {
     final cards = _cards(3);
-    final meld = Meld(cards: List.of(cards));
-    final cardKey = GlobalKey();
-    var reportedInsertionIndex = -1;
+    int? previewIndex;
 
     await tester.pumpWidget(
       _testApp(
-        MeldWidget(
-          meld: meld,
-          cardKeys: [cardKey, GlobalKey(), GlobalKey()],
-          onCardDragUpdated: (_, _) {},
-          onCardDropped: (_, card, _, insertionIndex) {
-            reportedInsertionIndex = insertionIndex;
-            final source = meld.cards.indexOf(card);
-            meld.cards.removeAt(source);
-            meld.cards.insert(
-              insertionIndex > source ? insertionIndex - 1 : insertionIndex,
-              card,
-            );
-          },
+        StatefulBuilder(
+          builder: (context, setState) => Column(
+            children: [
+              MeldWidget(
+                key: meldKey,
+                meld: Meld(cards: cards),
+                previewInsertionIndex: previewIndex,
+                onCardDragUpdated: (_, _) {},
+                onCardDropped: (_, _, _, _) {},
+              ),
+              ElevatedButton(
+                onPressed: () => setState(() => previewIndex = 1),
+                child: const Text('preview'),
+              ),
+            ],
+          ),
         ),
       ),
     );
 
-    final gesture = await tester.startGesture(
-      tester.getCenter(find.byKey(cardKey)),
-    );
-    await gesture.moveBy(const Offset(120, 0));
-    await gesture.up();
+    final before = tester.getRect(find.byKey(meldKey));
+    await tester.tap(find.text('preview'));
     await tester.pumpAndSettle();
+    final after = tester.getRect(find.byKey(meldKey));
 
-    expect(reportedInsertionIndex, 3);
-    expect(meld.cards, [cards[1], cards[2], cards[0]]);
+    expect(after, before);
+    expect(after.width, 80 + 2 * 60);
   });
 
   testWidgets('hand-to-meld insertion still inserts the dragged card', (
@@ -234,7 +78,10 @@ void main() {
           onCardDragEnded: () {},
           onCardDropped: (draggedCards, _) {
             final index = game.currentPlayer.hand.indexOf(draggedCards.single);
-            service.addCardsToMeld(0, [index], insertionIndex: 1);
+            final success = service.addCardsToMeld(0, [
+              index,
+            ], insertionIndex: 2);
+            expect(success, isTrue);
           },
         ),
       ),
@@ -243,14 +90,249 @@ void main() {
     final gesture = await tester.startGesture(
       tester.getCenter(find.byKey(handKey)),
     );
-    await gesture.moveBy(const Offset(20, -120));
+    await gesture.moveBy(const Offset(20, -220));
     await gesture.up();
     await tester.pumpAndSettle();
 
     expect(game.currentPlayer.melds.single.cards, [
       meldCards[0],
-      handCard,
       meldCards[1],
+      handCard,
     ]);
   });
+
+  testWidgets('multi-card external hover reports the raw pointer position', (
+    tester,
+  ) async {
+    final hand = _cards(3);
+    Offset? reportedPosition;
+
+    await tester.pumpWidget(
+      _testApp(
+        PlayerHandWidget(
+          hand: hand,
+          selectedIndexes: const {0, 1, 2},
+          onCardDragUpdated: (position) => reportedPosition = position,
+        ),
+      ),
+    );
+
+    final start = tester.getCenter(find.byKey(ValueKey(hand[0].id)));
+    final gesture = await tester.startGesture(start);
+    await gesture.moveBy(const Offset(10, 0));
+    await tester.pump();
+    await gesture.moveBy(const Offset(100, 0));
+    await tester.pump();
+    await gesture.cancel();
+
+    expect(reportedPosition, start + const Offset(110, 0));
+  });
+
+  testWidgets('internal hand dragging still reorders cards', (tester) async {
+    final game = Game(deck: Deck(), players: [Player('Player'), Player('AI')]);
+    final hand = _cards(3);
+    game.currentPlayer.hand.addAll(hand);
+
+    await tester.pumpWidget(
+      _testApp(
+        PlayerHandWidget(
+          key: GlobalKey(),
+          hand: game.currentPlayer.hand,
+          selectedIndexes: const {},
+        ),
+      ),
+    );
+
+    final start = tester.getCenter(find.byKey(ValueKey(hand[0].id)));
+    final end =
+        tester.getCenter(find.byKey(ValueKey(hand[2].id))) +
+        const Offset(12, 0);
+    final gesture = await tester.startGesture(start);
+    await gesture.moveBy(const Offset(10, 0));
+    await tester.pump();
+    await gesture.moveTo(end);
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(game.currentPlayer.hand, [hand[1], hand[2], hand[0]]);
+  });
+
+  testWidgets('internal hand dragging can reorder cards in reverse', (
+    tester,
+  ) async {
+    final game = Game(deck: Deck(), players: [Player('Player'), Player('AI')]);
+    final hand = _cards(3);
+    game.currentPlayer.hand.addAll(hand);
+
+    await tester.pumpWidget(
+      _testApp(
+        PlayerHandWidget(
+          key: GlobalKey(),
+          hand: game.currentPlayer.hand,
+          selectedIndexes: const {},
+        ),
+      ),
+    );
+
+    final start = tester.getCenter(find.byKey(ValueKey(hand[2].id)));
+    final end =
+        tester.getCenter(find.byKey(ValueKey(hand[0].id))) -
+        const Offset(12, 0);
+    final gesture = await tester.startGesture(start);
+    await gesture.moveBy(const Offset(-10, 0));
+    await tester.pump();
+    await gesture.moveTo(end);
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(game.currentPlayer.hand, [hand[2], hand[0], hand[1]]);
+  });
+
+  testWidgets('internal reorder deselects moved cards and remaps others', (
+    tester,
+  ) async {
+    final game = Game(deck: Deck(), players: [Player('Player'), Player('AI')]);
+    final hand = _cards(4);
+    game.currentPlayer.hand.addAll(hand);
+    final selected = <int>{0, 1};
+    final handKey = GlobalKey();
+
+    await tester.pumpWidget(
+      _testApp(
+        PlayerHandWidget(
+          key: handKey,
+          hand: game.currentPlayer.hand,
+          selectedIndexes: selected,
+          onSelectionChanged: (value) {
+            selected
+              ..clear()
+              ..addAll(value);
+          },
+        ),
+      ),
+    );
+
+    final start = tester.getCenter(find.byKey(ValueKey(hand[0].id)));
+    final end = tester.getCenter(find.byKey(ValueKey(hand[2].id)));
+    final gesture = await tester.startGesture(start);
+    await gesture.moveBy(const Offset(10, 0));
+    await tester.pump();
+    await gesture.moveTo(end);
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(game.currentPlayer.hand, [hand[2], hand[0], hand[1], hand[3]]);
+    expect(selected, isEmpty);
+  });
+
+  testWidgets('reordering an unselected card preserves unrelated selection', (
+    tester,
+  ) async {
+    final game = Game(deck: Deck(), players: [Player('Player'), Player('AI')]);
+    final hand = _cards(3);
+    game.currentPlayer.hand.addAll(hand);
+    final selected = <int>{1};
+
+    await tester.pumpWidget(
+      _testApp(
+        PlayerHandWidget(
+          key: GlobalKey(),
+          hand: game.currentPlayer.hand,
+          selectedIndexes: selected,
+          onSelectionChanged: (value) {
+            selected
+              ..clear()
+              ..addAll(value);
+          },
+        ),
+      ),
+    );
+
+    final start = tester.getCenter(find.byKey(ValueKey(hand[0].id)));
+    final end = tester.getCenter(find.byKey(ValueKey(hand[2].id))) +
+        const Offset(12, 0);
+    final gesture = await tester.startGesture(start);
+    await gesture.moveBy(const Offset(10, 0));
+    await tester.pump();
+    await gesture.moveTo(end);
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(game.currentPlayer.hand, [hand[1], hand[2], hand[0]]);
+    expect(selected, {0});
+  });
+
+  testWidgets('tapping a card still toggles selection', (tester) async {
+    final game = Game(deck: Deck(), players: [Player('Player'), Player('AI')]);
+    final hand = _cards(2);
+    game.currentPlayer.hand.addAll(hand);
+    final selected = <int>{};
+
+    await tester.pumpWidget(
+      _testApp(
+        PlayerHandWidget(
+          key: GlobalKey(),
+          hand: game.currentPlayer.hand,
+          selectedIndexes: selected,
+          onCardTapped: (index) {
+            if (!selected.add(index)) selected.remove(index);
+          },
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(ValueKey(hand[0].id)));
+    expect(selected, {0});
+    await tester.tap(find.byKey(ValueKey(hand[0].id)));
+    expect(selected, isEmpty);
+  });
+
+  testWidgets(
+    'invalid multi-card external drops preserve order and selection',
+    (tester) async {
+      final game = Game(
+        deck: Deck(),
+        players: [Player('Player'), Player('AI')],
+      );
+      final hand = _cards(4);
+      game.currentPlayer.hand.addAll(hand);
+      final selected = <int>{0, 1};
+      final originalHand = List<CardModel>.of(hand);
+
+      await tester.pumpWidget(
+        _testApp(
+          PlayerHandWidget(
+            key: GlobalKey(),
+            hand: game.currentPlayer.hand,
+            selectedIndexes: selected,
+            onSelectionChanged: (value) {
+              selected
+                ..clear()
+                ..addAll(value);
+            },
+            onCardDropped: (draggedCards, _) {
+              final indexes = draggedCards
+                  .map(game.currentPlayer.hand.indexOf)
+                  .toList();
+              expect(game.createMeld(indexes), isFalse);
+            },
+          ),
+        ),
+      );
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(ValueKey(hand[0].id))),
+      );
+      await gesture.moveBy(const Offset(0, -160));
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(game.currentPlayer.hand, orderedEquals(originalHand));
+      expect(selected, {0, 1});
+    },
+  );
 }

@@ -1,5 +1,6 @@
 import '../models/card.dart';
 import '../models/game.dart';
+import '../rules/rabino_rules.dart';
 import 'sort_service.dart';
 
 class GameService {
@@ -51,8 +52,18 @@ class GameService {
     return true;
   }
 
-  bool createMeld(List<int> handIndexes) {
-    return game.createMeld(handIndexes);
+  bool createMeld(List<int> handIndexes, {int? insertionIndex}) {
+    return game.createMeld(handIndexes, insertionIndex: insertionIndex);
+  }
+
+  MeldCreationResult createMeldResult(
+    List<int> handIndexes, {
+    int? insertionIndex,
+  }) {
+    return game.createMeldResult(
+      handIndexes,
+      insertionIndex: insertionIndex,
+    );
   }
 
   bool addCardsToMeld(
@@ -65,6 +76,29 @@ class GameService {
       handIndexes,
       insertionIndex: insertionIndex,
     );
+  }
+
+  MeldAdditionResult? resolveAddCardsToMeld(
+    int meldIndex,
+    List<int> handIndexes,
+  ) {
+    return game.resolveAddCardsToMeld(meldIndex, handIndexes);
+  }
+
+  bool applyMeldAddition(
+    int meldIndex,
+    List<int> handIndexes,
+    MeldAdditionAlternative alternative,
+  ) {
+    return game.applyMeldAddition(meldIndex, handIndexes, alternative);
+  }
+
+  MeldAdditionAlternative? selectMeldAdditionAlternative(
+    int meldIndex,
+    MeldAdditionResult result,
+    bool leftSide,
+  ) {
+    return game.selectMeldAdditionAlternative(meldIndex, result, leftSide);
   }
 
   bool reorderMeldCard(int meldIndex, int cardId, int insertionIndex) {
