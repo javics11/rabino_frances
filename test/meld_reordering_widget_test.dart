@@ -19,42 +19,23 @@ Widget _testApp(Widget child) {
 }
 
 void main() {
-  testWidgets('meld insertion preview does not change meld geometry', (
+  testWidgets('fixed meld geometry remains unchanged', (
     tester,
   ) async {
     final meldKey = GlobalKey();
     final cards = _cards(3);
-    int? previewIndex;
 
     await tester.pumpWidget(
       _testApp(
-        StatefulBuilder(
-          builder: (context, setState) => Column(
-            children: [
-              MeldWidget(
-                key: meldKey,
-                meld: Meld(cards: cards),
-                previewInsertionIndex: previewIndex,
-                onCardDragUpdated: (_, _) {},
-                onCardDropped: (_, _, _, _) {},
-              ),
-              ElevatedButton(
-                onPressed: () => setState(() => previewIndex = 1),
-                child: const Text('preview'),
-              ),
-            ],
-          ),
+        MeldWidget(
+          key: meldKey,
+          meld: Meld(cards: cards),
         ),
       ),
     );
 
-    final before = tester.getRect(find.byKey(meldKey));
-    await tester.tap(find.text('preview'));
-    await tester.pumpAndSettle();
-    final after = tester.getRect(find.byKey(meldKey));
-
-    expect(after, before);
-    expect(after.width, 80 + 2 * 60);
+    final rect = tester.getRect(find.byKey(meldKey));
+    expect(rect.width, 80 + 2 * 60);
   });
 
   testWidgets('hand-to-meld insertion still inserts the dragged card', (

@@ -343,23 +343,6 @@ class Game {
     return true;
   }
 
-  bool reorderMeldCard(int meldIndex, int cardId, int insertionIndex) {
-    final player = currentPlayer;
-    if (meldIndex < 0 || meldIndex >= player.melds.length) return false;
-
-    final cards = player.melds[meldIndex].cards;
-    final sourceIndex = cards.indexWhere((card) => card.id == cardId);
-    if (sourceIndex == -1 || insertionIndex < 0 || insertionIndex > cards.length) {
-      return false;
-    }
-
-    final card = cards.removeAt(sourceIndex);
-    var targetIndex = insertionIndex;
-    if (sourceIndex < targetIndex) targetIndex--;
-    cards.insert(targetIndex, card);
-    return true;
-  }
-
   void endTurn() {
     hasDrawnThisTurn = false;
 

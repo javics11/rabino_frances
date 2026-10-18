@@ -10,8 +10,6 @@ void main() {
   testWidgets('existing meld cards are not drag sources but meld taps remain active',
       (tester) async {
     var tapCount = 0;
-    var dragUpdateCount = 0;
-    var dropCount = 0;
     final meld = Meld(cards: [
       const CardModel(id: 1, rank: 6, suit: SpanishSuit.bastos),
       const CardModel(id: 2, rank: 5, suit: SpanishSuit.bastos),
@@ -25,9 +23,6 @@ void main() {
             melds: [meld],
             emptyText: 'MELDS',
             onMeldTapped: (_, _) => tapCount++,
-            onMeldCardDragUpdated: (_, _) => dragUpdateCount++,
-            onMeldCardDropped: (_, _, _, _) => dropCount++,
-            onMeldCardDragEnded: () {},
           ),
         ),
       ),
@@ -42,7 +37,5 @@ void main() {
     await gesture.up();
     await tester.pump();
 
-    expect(dragUpdateCount, 0);
-    expect(dropCount, 0);
   });
 }

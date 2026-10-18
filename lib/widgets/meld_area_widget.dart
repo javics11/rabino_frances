@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../models/meld.dart';
 import 'meld_widget.dart';
-import '../models/card.dart';
 
 class MeldAreaWidget extends StatelessWidget {
   final List<Meld> melds;
@@ -14,13 +13,9 @@ class MeldAreaWidget extends StatelessWidget {
   final List<GlobalKey>? meldKeys;
   final List<List<GlobalKey>>? meldCardKeys;
   final int? hoveredMeldIndex;
-  final int? hoveredInsertionIndex;
   final int? newMeldInsertionIndex;
   final void Function(int, Offset)? onMeldTapped;
   final ValueChanged<Offset>? onAreaTapped;
-  final void Function(int, Offset)? onMeldCardDragUpdated;
-  final void Function(int, CardModel, Offset, int)? onMeldCardDropped;
-  final VoidCallback? onMeldCardDragEnded;
 
   const MeldAreaWidget({
     super.key,
@@ -31,13 +26,9 @@ class MeldAreaWidget extends StatelessWidget {
     this.meldKeys,
     this.meldCardKeys,
     this.hoveredMeldIndex,
-    this.hoveredInsertionIndex,
     this.newMeldInsertionIndex,
     this.onMeldTapped,
     this.onAreaTapped,
-    this.onMeldCardDragUpdated,
-    this.onMeldCardDropped,
-    this.onMeldCardDragEnded,
   });
 
   @override
@@ -107,16 +98,10 @@ class MeldAreaWidget extends StatelessWidget {
                                   cardKeys: meldCardKeys != null
                                       ? meldCardKeys![index]
                                       : null,
-                                  previewInsertionIndex: hoveredMeldIndex == index
-                                      ? hoveredInsertionIndex
-                                      : null,
                                   onTap: onMeldTapped == null
                                       ? null
                                       : (position) =>
                                           onMeldTapped!(index, position),
-                                  onCardDragUpdated: null,
-                                  onCardDropped: null,
-                                  onCardDragEnded: null,
                                 ),
                               ),
                             ),

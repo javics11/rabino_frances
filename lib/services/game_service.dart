@@ -101,10 +101,6 @@ class GameService {
     return game.selectMeldAdditionAlternative(meldIndex, result, leftSide);
   }
 
-  bool reorderMeldCard(int meldIndex, int cardId, int insertionIndex) {
-    return game.reorderMeldCard(meldIndex, cardId, insertionIndex);
-  }
-
   void sortCurrentPlayerByRank() {
     SortService.sortByRank(game.currentPlayer.hand);
   }
