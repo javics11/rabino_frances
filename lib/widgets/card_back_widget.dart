@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 
+import 'card_geometry.dart';
+
 class CardBackWidget extends StatelessWidget {
-  const CardBackWidget({super.key});
+  final CardGeometry geometry;
+
+  const CardBackWidget({super.key, this.geometry = CardGeometry.desktop});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 60,
-      height: 90,
-      margin: const EdgeInsets.symmetric(horizontal: 2),
+      width: geometry.cardWidth,
+      height: geometry.cardHeight,
+      margin: EdgeInsets.symmetric(horizontal: geometry.cardMargin),
       decoration: BoxDecoration(
         color: Colors.indigo,
         borderRadius: BorderRadius.circular(8),

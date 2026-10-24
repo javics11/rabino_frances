@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../models/meld.dart';
 import 'meld_widget.dart';
+import 'meld_orientation.dart';
+import 'card_geometry.dart';
 
 class MeldAreaWidget extends StatelessWidget {
   final List<Meld> melds;
@@ -16,6 +18,9 @@ class MeldAreaWidget extends StatelessWidget {
   final int? newMeldInsertionIndex;
   final void Function(int, Offset)? onMeldTapped;
   final ValueChanged<Offset>? onAreaTapped;
+  final MeldOrientation orientation;
+  final CardGeometry geometry;
+  final double? availableHeight;
 
   const MeldAreaWidget({
     super.key,
@@ -29,10 +34,19 @@ class MeldAreaWidget extends StatelessWidget {
     this.newMeldInsertionIndex,
     this.onMeldTapped,
     this.onAreaTapped,
+    this.orientation = MeldOrientation.horizontal,
+    this.geometry = CardGeometry.desktop,
+    this.availableHeight,
   });
 
   @override
   Widget build(BuildContext context) {
+    final contentHeight = orientation == MeldOrientation.vertical && melds.isNotEmpty
+        ? melds
+              .map((meld) => geometry.verticalMeldHeight(meld.cards.length))
+              .reduce((first, second) => first > second ? first : second)
+        : geometry.cardHeight;
+    final meldHeight = availableHeight ?? contentHeight;
     return GestureDetector(
       key: areaKey,
       behavior: HitTestBehavior.deferToChild,
@@ -40,7 +54,7 @@ class MeldAreaWidget extends StatelessWidget {
           ? null
           : (details) => onAreaTapped!(details.globalPosition),
       child: SizedBox(
-        height: 120,
+        height: meldHeight,
         width: double.infinity,
         child: Stack(
           children: [
@@ -70,6 +84,7 @@ class MeldAreaWidget extends StatelessWidget {
                   scrollDirection: Axis.horizontal,
                   child: IntrinsicWidth(
                     child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         for (int index = 0; index <= melds.length; index++) ...[
@@ -95,6 +110,8 @@ class MeldAreaWidget extends StatelessWidget {
                                 child: MeldWidget(
                                   meldKey: meldKeys != null ? meldKeys![index] : null,
                                   meld: melds[index],
+                                  orientation: orientation,
+                                  geometry: geometry,
                                   cardKeys: meldCardKeys != null
                                       ? meldCardKeys![index]
                                       : null,

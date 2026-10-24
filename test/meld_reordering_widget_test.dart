@@ -8,6 +8,7 @@ import 'package:rabino_frances/models/meld.dart';
 import 'package:rabino_frances/models/player.dart';
 import 'package:rabino_frances/services/game_service.dart';
 import 'package:rabino_frances/widgets/meld_widget.dart';
+import 'package:rabino_frances/widgets/meld_orientation.dart';
 import 'package:rabino_frances/widgets/player_hand_widget.dart';
 
 List<CardModel> _cards(int count) => Deck().cards.take(count).toList();
@@ -30,6 +31,7 @@ void main() {
         MeldWidget(
           key: meldKey,
           meld: Meld(cards: cards),
+          orientation: MeldOrientation.horizontal,
         ),
       ),
     );

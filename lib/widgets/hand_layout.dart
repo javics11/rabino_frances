@@ -1,3 +1,5 @@
+import 'card_geometry.dart';
+
 /// Calculates where every card should be positioned in the hand.
 ///
 /// For now, every card stays in its normal place.
@@ -5,24 +7,23 @@
 /// Later this class will also calculate the temporary gap
 /// created while dragging a card.
 class HandLayout {
-  static const double cardWidth = 80;
-  static const double overlap = 20;
-
   /// Horizontal distance between consecutive cards.
-  static double get spacing => cardWidth - overlap;
+  static double spacingFor(CardGeometry geometry) => geometry.cardWidth * .75;
 
   /// Width occupied by the whole hand.
-  static double totalWidth(int numberOfCards) {
+  static double totalWidth(int numberOfCards, [CardGeometry? geometry]) {
     if (numberOfCards <= 0) {
       return 0;
     }
 
-    return cardWidth + (numberOfCards - 1) * spacing;
+    final cardGeometry = geometry ?? CardGeometry.desktop;
+    return cardGeometry.cardWidth +
+        (numberOfCards - 1) * spacingFor(cardGeometry);
   }
 
   /// Left position of the card.
-  static double leftPosition(int index) {
-    return index * spacing;
+  static double leftPosition(int index, [CardGeometry? geometry]) {
+    return index * spacingFor(geometry ?? CardGeometry.desktop);
   }
 
   /// Vertical position.
@@ -37,6 +38,6 @@ class HandLayout {
       return 0;
     }
 
-    return 10;
+    return 0;
   }
 }

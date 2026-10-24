@@ -4,6 +4,7 @@ import '../models/card.dart';
 import 'card_back_widget.dart';
 import 'card_widget.dart';
 import 'hand_layout.dart';
+import 'card_geometry.dart';
 
 class PlayerHandWidget extends StatefulWidget {
   final List<CardModel> hand;
@@ -16,6 +17,8 @@ class PlayerHandWidget extends StatefulWidget {
   final ValueChanged<Offset>? onCardDragUpdated;
   final VoidCallback? onCardDragEnded;
   final bool showFront;
+  final CardGeometry geometry;
+  final bool compactVertical;
 
   const PlayerHandWidget({
     super.key,
@@ -27,6 +30,8 @@ class PlayerHandWidget extends StatefulWidget {
     this.onCardDragUpdated,
     this.onCardDragEnded,
     this.showFront = true,
+    this.geometry = CardGeometry.desktop,
+    this.compactVertical = false,
   });
 
   @override
@@ -52,15 +57,16 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
     }
 
     final draggedCenter =
-        HandLayout.leftPosition(draggingIndex!) +
+        HandLayout.leftPosition(draggingIndex!, widget.geometry) +
         dragOffset.dx +
-        HandLayout.cardWidth / 2;
+        widget.geometry.cardWidth / 2;
 
     int insertIndex = 0;
 
     while (insertIndex < widget.hand.length) {
       final cardCenter =
-          HandLayout.leftPosition(insertIndex) + HandLayout.cardWidth / 2;
+          HandLayout.leftPosition(insertIndex, widget.geometry) +
+          widget.geometry.cardWidth / 2;
 
       if (draggedCenter < cardCenter) {
         break;
@@ -74,7 +80,7 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final totalWidth = HandLayout.totalWidth(widget.hand.length);
+    final totalWidth = HandLayout.totalWidth(widget.hand.length, widget.geometry);
 
     gapIndex = draggingIndex == null ? null : _calculateGapIndex();
     final cardIndexes = List<int>.generate(widget.hand.length, (index) => index);
@@ -83,20 +89,20 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
       final isBeingDragged = draggingIndexes.contains(index);
 
       // Calculate where this card should be positioned
-      double left = HandLayout.leftPosition(index);
+      double left = HandLayout.leftPosition(index, widget.geometry);
 
       if (draggingIndex != null && gapIndex != null) {
         // Moving to the right
         if (gapIndex! > draggingIndex!) {
           if (index > draggingIndex! && index < gapIndex!) {
-            left -= HandLayout.spacing;
+            left -= HandLayout.spacingFor(widget.geometry);
           }
         }
 
         // Moving to the left
         if (gapIndex! < draggingIndex!) {
           if (index >= gapIndex! && index < draggingIndex!) {
-            left += HandLayout.spacing;
+            left += HandLayout.spacingFor(widget.geometry);
           }
         }
       }
@@ -111,7 +117,8 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
             ? dragStartLeft +
                   dragOffset.dx -
                   dragAnchorX +
-                  draggingIndexes.indexOf(index) * HandLayout.spacing
+                  draggingIndexes.indexOf(index) *
+                      HandLayout.spacingFor(widget.geometry)
             : left,
 
         top:
@@ -135,7 +142,8 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
                       ? (details) {
                           setState(() {
                             draggingIndex = index;
-                            dragStartLeft = HandLayout.leftPosition(index);
+                            dragStartLeft =
+                                HandLayout.leftPosition(index, widget.geometry);
                             gapIndex = index;
                             dragOffset = Offset.zero;
                             fingerPosition = details.globalPosition;
@@ -149,7 +157,7 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
 
                             dragAnchorX =
                                 (draggingIndexes.length - 1) *
-                                HandLayout.spacing /
+                                HandLayout.spacingFor(widget.geometry) /
                                 2;
                           });
                         }
@@ -252,9 +260,10 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
                       child: widget.showFront
                           ? CardWidget(
                               card: widget.hand[index],
+                              geometry: widget.geometry,
                               selected: widget.selectedIndexes.contains(index),
                             )
-                          : const CardBackWidget(),
+                          : CardBackWidget(geometry: widget.geometry),
                     ),
                   ),
                 ),
@@ -266,13 +275,14 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
     }
 
     return SizedBox(
-      height: 180,
-      child: Center(
+      height: widget.geometry.cardHeight,
+      child: Align(
+        alignment: Alignment.center,
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: SizedBox(
             width: totalWidth,
-            height: 170,
+            height: widget.geometry.cardHeight,
             child: Stack(
               clipBehavior: Clip.none,
               children: [

@@ -8,6 +8,9 @@ import '../services/drag_drop_service.dart';
 import '../services/game_service.dart';
 import '../services/ai_service.dart';
 import '../rules/rabino_rules.dart';
+import '../widgets/meld_orientation.dart';
+import '../widgets/card_widget.dart';
+import '../widgets/card_geometry.dart';
 
 class GameScreen extends StatefulWidget {
   final Game game;
@@ -31,6 +34,7 @@ class _GameScreenState extends State<GameScreen> {
   final List<List<GlobalKey>> playerMeldCardKeys = [];
   int? hoveredMeldIndex;
   int? newMeldInsertionIndex;
+  final MeldOrientation meldOrientation = MeldOrientation.vertical;
 
   @override
   void initState() {
@@ -147,69 +151,115 @@ class _GameScreenState extends State<GameScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Rabino Francés'),
-        actions: [
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              switch (value) {
-                case "new_game":
-                  _newGame();
-                  break;
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: "new_game", child: Text("New Game")),
-            ],
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            color: Colors.amber.shade100,
-            child: Text(
-              widget.game.currentPlayerIndex == 0 ? 'YOUR TURN' : 'AI TURN',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-            ),
-          ),
-
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final geometry = CardGeometry.fromBoardConstraints(constraints);
+          final controlHeight =
+              ((geometry.cardHeight - 4) / 3).clamp(26.0, 40.0).toDouble();
+          final controlStyle = ElevatedButton.styleFrom(
+            minimumSize: Size(0, controlHeight),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
+          );
+          return Column(
+            children: [
           Expanded(
             child: Container(
               color: Colors.green.shade200,
               child: Column(
                 children: [
-                  const SizedBox(height: 10),
-
-                  PlayerHandWidget(
-                    hand: aiPlayer.hand,
-                    selectedIndexes: const {},
-                    showFront: false,
+                  LayoutBuilder(
+                    builder: (context, handConstraints) {
+                      final showTitle = handConstraints.maxWidth >= 560;
+                      final opponentHand = PlayerHandWidget(
+                        hand: aiPlayer.hand,
+                        selectedIndexes: const {},
+                        showFront: false,
+                        geometry: geometry,
+                        compactVertical: true,
+                      );
+                      return SizedBox(
+                        key: const ValueKey('opponent-hand-band'),
+                        height: geometry.handHeight,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            opponentHand,
+                            if (showTitle)
+                              const Positioned(
+                                left: 8,
+                                top: 0,
+                                child: Text(
+                                  'Rabino Francés',
+                                  key: ValueKey('game-title'),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              ),
+                            Positioned(
+                              right: 4,
+                              top: 0,
+                              child: PopupMenuButton<String>(
+                                key: const ValueKey('options-menu'),
+                                padding: EdgeInsets.zero,
+                                onSelected: (value) {
+                                  if (value == 'new_game') _newGame();
+                                },
+                                itemBuilder: (context) => const [
+                                  PopupMenuItem(
+                                    value: 'new_game',
+                                    child: Text('New Game'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
 
-                  const SizedBox(height: 20),
-
-                  MeldAreaWidget(
-                    areaKey: aiMeldAreaKey,
-                    melds: aiPlayer.melds,
-                    emptyText: "AI MELDS",
+                  Expanded(
+                    child: ClipRect(
+                      child: LayoutBuilder(
+                        builder: (context, regionConstraints) =>
+                            MeldAreaWidget(
+                              areaKey: aiMeldAreaKey,
+                              melds: aiPlayer.melds,
+                              emptyText: "AI MELDS",
+                              orientation: meldOrientation,
+                              geometry: geometry,
+                              availableHeight: regionConstraints.maxHeight,
+                            ),
+                      ),
+                    ),
                   ),
-
-                  const Spacer(),
 
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _buildDrawPile(),
+                      Text(
+                        widget.game.currentPlayerIndex == 0
+                            ? 'YOUR TURN'
+                            : 'AI TURN',
+                        key: const ValueKey('turn-indicator'),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(width: 16),
+                      _buildDrawPile(geometry),
                       const SizedBox(width: 40),
-                      _buildDiscardPile(),
+                      _buildDiscardPile(geometry),
                     ],
                   ),
 
-                  const Spacer(),
-
-                  MeldAreaWidget(
+                  Expanded(
+                    child: ClipRect(
+                      child: LayoutBuilder(
+                        builder: (context, regionConstraints) =>
+                            MeldAreaWidget(
                     areaKey: playerMeldAreaKey,
                     meldKeys: playerMeldKeys,
                     meldCardKeys: playerMeldCardKeys,
@@ -217,6 +267,9 @@ class _GameScreenState extends State<GameScreen> {
                     hoveredMeldIndex: hoveredMeldIndex,
                     newMeldInsertionIndex: newMeldInsertionIndex,
                     emptyText: "MELDS",
+                    orientation: meldOrientation,
+                    geometry: geometry,
+                    availableHeight: regionConstraints.maxHeight,
 
                     onMeldTapped: (meldIndex, position) {
                       if (selectedCardIndexes.isEmpty) {
@@ -288,52 +341,41 @@ class _GameScreenState extends State<GameScreen> {
                         _showMeldRejection(status: failureStatus);
                       }
                     },
+                            ),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
           ),
 
-          //====================================================
-          // SORT BUTTONS
-          //====================================================
           Container(
-            color: Colors.grey.shade200,
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            color: Colors.green.shade200,
+            padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
+            child: SizedBox(
+              key: const ValueKey('human-hand-band'),
+              height: geometry.cardHeight,
+              child: Stack(
+                alignment: Alignment.topCenter,
               children: [
-                ElevatedButton(
-                  onPressed: _sortByRank,
-                  child: const Text("Sort Rank"),
-                ),
-                const SizedBox(width: 10),
-                ElevatedButton(
-                  onPressed: _sortBySuit,
-                  child: const Text("Sort Suit"),
-                ),
-                const SizedBox(width: 10),
-                ElevatedButton(
-                  onPressed: selectedCardIndexes.isEmpty
-                      ? null
-                      : () {
-                          setState(() {
-                            selectedCardIndexes.clear();
-                          });
-                        },
-                  child: const Text("Clear"),
-                ),
-              ],
-            ),
-          ),
+                Align(
+                  alignment: Alignment.topCenter,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) =>
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minWidth: constraints.maxWidth,
+                            ),
+                            child: Center(
+                              child: PlayerHandWidget(
+                                hand: player.hand,
+                                selectedIndexes: selectedCardIndexes,
+                                geometry: geometry,
 
-          Container(
-            color: Colors.grey.shade300,
-            child: PlayerHandWidget(
-              hand: player.hand,
-              selectedIndexes: selectedCardIndexes,
-
-              onCardTapped: (index) {
+                                onCardTapped: (index) {
                 if (widget.game.currentPlayerIndex != 0) {
                   return;
                 }
@@ -345,22 +387,22 @@ class _GameScreenState extends State<GameScreen> {
                     selectedCardIndexes.add(index);
                   }
                 });
-              },
+                                },
 
-              onSelectionChanged: (selection) {
+                                onSelectionChanged: (selection) {
                 setState(() {
                   selectedCardIndexes
                     ..clear()
                     ..addAll(selection);
                 });
-              },
+                                },
 
-              onCardDragUpdated: (position) {
+                                onCardDragUpdated: (position) {
                 _updateHoveredMeld(position);
-              },
-              onCardDragEnded: _clearHoveredMeld,
+                                },
+                                onCardDragEnded: _clearHoveredMeld,
 
-              onCardDropped: (draggedCards, position) {
+                                onCardDropped: (draggedCards, position) {
                 final handIndexes = <int>[];
 
                 for (final draggedCard in draggedCards) {
@@ -463,12 +505,56 @@ class _GameScreenState extends State<GameScreen> {
 
                   return;
                 }
-              },
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                  ),
+                ),
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ElevatedButton(
+                      key: const ValueKey('sort-suit-button'),
+                      style: controlStyle,
+                      onPressed: _sortBySuit,
+                      child: const Text("Sort Suit"),
+                    ),
+                    const SizedBox(height: 2),
+                    ElevatedButton(
+                      key: const ValueKey('sort-rank-button'),
+                      style: controlStyle,
+                      onPressed: _sortByRank,
+                      child: const Text("Sort Rank"),
+                    ),
+                    const SizedBox(height: 2),
+                    ElevatedButton(
+                      key: const ValueKey('clear-hand-button'),
+                      style: controlStyle,
+                      onPressed: selectedCardIndexes.isEmpty
+                          ? null
+                          : () {
+                              setState(() {
+                                selectedCardIndexes.clear();
+                              });
+                            },
+                      child: const Text("Clear"),
+                    ),
+                  ],
+                  ),
+                ),
+              ],
+              ),
             ),
           ),
 
-          const SizedBox(height: 10),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -483,7 +569,7 @@ class _GameScreenState extends State<GameScreen> {
     return playerMeldKeys.length;
   }
 
-  Widget _buildDrawPile() {
+  Widget _buildDrawPile(CardGeometry geometry) {
     return GestureDetector(
       onTap: widget.game.currentPlayerIndex != 0 || !widget.game.canDraw()
           ? null
@@ -493,8 +579,8 @@ class _GameScreenState extends State<GameScreen> {
               });
             },
       child: Container(
-        width: 80,
-        height: 120,
+        width: geometry.cardFootprintWidth,
+        height: geometry.cardHeight,
         decoration: BoxDecoration(
           color: widget.game.canDraw() ? Colors.blue : Colors.grey,
           borderRadius: BorderRadius.circular(10),
@@ -513,7 +599,7 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  Widget _buildDiscardPile() {
+  Widget _buildDiscardPile(CardGeometry geometry) {
     return GestureDetector(
       key: discardPileKey,
       onTap: () {
@@ -543,10 +629,12 @@ class _GameScreenState extends State<GameScreen> {
         });
       },
       child: Container(
-        width: 80,
-        height: 120,
+        width: geometry.cardFootprintWidth,
+        height: geometry.cardHeight,
         decoration: BoxDecoration(
-          color: Colors.red,
+          color: widget.game.discardPile.isEmpty
+              ? Colors.red
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Center(
@@ -558,14 +646,10 @@ class _GameScreenState extends State<GameScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 )
-              : Text(
-                  widget.game.discardPile.last.shortDisplay,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
+              : CardWidget(
+                  card: widget.game.discardPile.last,
+                  selected: false,
+                  geometry: geometry,
                 ),
         ),
       ),
