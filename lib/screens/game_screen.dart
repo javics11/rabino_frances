@@ -47,14 +47,31 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _sortByRank() {
-    setState(() {
-      gameService.sortCurrentPlayerByRank();
-    });
+    _sortHandPreservingSelection(gameService.sortCurrentPlayerByRank);
   }
 
   void _sortBySuit() {
+    _sortHandPreservingSelection(gameService.sortCurrentPlayerBySuit);
+  }
+
+  void _sortHandPreservingSelection(void Function() sortHand) {
+    final selectedCardIds = selectedCardIndexes
+        .where(
+          (index) =>
+              index >= 0 && index < widget.game.currentPlayer.hand.length,
+        )
+        .map((index) => widget.game.currentPlayer.hand[index].id)
+        .toSet();
+
     setState(() {
-      gameService.sortCurrentPlayerBySuit();
+      sortHand();
+      selectedCardIndexes
+        ..clear()
+        ..addAll(
+          widget.game.currentPlayer.hand.asMap().entries
+              .where((entry) => selectedCardIds.contains(entry.value.id))
+              .map((entry) => entry.key),
+        );
     });
   }
 

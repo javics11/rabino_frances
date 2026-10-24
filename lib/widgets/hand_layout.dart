@@ -61,7 +61,7 @@ class HandLayout {
     }
 
     if (selected) {
-      return 0;
+      return -10;
     }
 
     return 0;

@@ -74,6 +74,22 @@ void _expectHumanHandAndControlsDoNotOverlap(WidgetTester tester) {
   expect(hand.right, lessThanOrEqualTo(controls.left));
 }
 
+Set<int> _selectedHumanCardIds(WidgetTester tester) {
+  return _humanCards()
+      .evaluate()
+      .map((element) => element.widget as CardWidget)
+      .where((card) => card.selected)
+      .map((card) => card.card.id)
+      .toSet();
+}
+
+Rect _humanCardRectById(WidgetTester tester, int cardId) {
+  final card = _humanCards().evaluate()
+      .map((element) => element.widget as CardWidget)
+      .firstWhere((card) => card.card.id == cardId);
+  return tester.getRect(find.byWidget(card));
+}
+
 void main() {
   testWidgets('compact board places title and turn in shared regions', (
     tester,
@@ -332,6 +348,86 @@ void main() {
       expect(rect.top, greaterThanOrEqualTo(hand.top - tolerance));
       expect(rect.bottom, lessThanOrEqualTo(hand.bottom + tolerance));
     }
+  });
+
+  testWidgets('selected human cards are visually raised without moving sideways', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(home: GameScreen(game: _gameWithFourteenHumanCards())),
+    );
+    await tester.pump();
+
+    final cards = _humanCards().evaluate()
+        .map((element) => element.widget as CardWidget)
+        .toList();
+    final selectedId = cards[0].card.id;
+    final comparisonId = cards[1].card.id;
+    final normalSelectedRect = _humanCardRectById(tester, selectedId);
+    final normalComparisonRect = _humanCardRectById(tester, comparisonId);
+
+    await tester.tap(find.byWidget(cards[0]));
+    await tester.pumpAndSettle();
+
+    final raisedRect = _humanCardRectById(tester, selectedId);
+    final raisedComparisonRect = _humanCardRectById(tester, comparisonId);
+    expect(raisedRect.top, lessThan(normalSelectedRect.top));
+    expect(raisedRect.top, closeTo(normalSelectedRect.top - 10, 1.0));
+    expect(raisedRect.left, closeTo(normalSelectedRect.left, 1.0));
+    expect(raisedComparisonRect.top, closeTo(normalComparisonRect.top, 1.0));
+    expect(raisedComparisonRect.left, closeTo(normalComparisonRect.left, 1.0));
+
+    final currentSelectedCard = _humanCards().evaluate()
+        .map((element) => element.widget as CardWidget)
+        .firstWhere((card) => card.card.id == selectedId);
+    await tester.tap(find.byWidget(currentSelectedCard));
+    await tester.pumpAndSettle();
+    expect(
+      _humanCardRectById(tester, selectedId).top,
+      closeTo(normalSelectedRect.top, 1.0),
+    );
+  });
+
+  testWidgets('sort by rank preserves selected physical cards', (tester) async {
+    final game = _gameWithFourteenHumanCards();
+    await tester.binding.setSurfaceSize(const Size(1000, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(MaterialApp(home: GameScreen(game: game)));
+    await tester.pump();
+
+    final cards = _humanCards().evaluate().map((e) => e.widget as CardWidget).toList();
+    final selectedIds = {cards[0].card.id, cards[5].card.id};
+    await tester.tap(find.byWidget(cards[0]));
+    await tester.tap(find.byWidget(cards[5]));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('sort-rank-button')));
+    await tester.pump();
+
+    expect(game.currentPlayer.hand.map((card) => card.id).toList(), isNot(equals([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13])));
+    expect(_selectedHumanCardIds(tester), selectedIds);
+  });
+
+  testWidgets('sort by suit preserves multiple selected physical cards', (
+    tester,
+  ) async {
+    final game = _gameWithFourteenHumanCards();
+    await tester.binding.setSurfaceSize(const Size(1000, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(MaterialApp(home: GameScreen(game: game)));
+    await tester.pump();
+
+    final cards = _humanCards().evaluate().map((e) => e.widget as CardWidget).toList();
+    final selectedIds = {cards[0].card.id, cards[1].card.id, cards[6].card.id};
+    for (final card in [cards[0], cards[1], cards[6]]) {
+      await tester.tap(find.byWidget(card));
+    }
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('sort-suit-button')));
+    await tester.pump();
+
+    expect(_selectedHumanCardIds(tester), selectedIds);
   });
 
   testWidgets('essential board regions have visible bounds', (tester) async {

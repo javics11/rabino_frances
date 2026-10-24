@@ -18,6 +18,15 @@ void main() {
     expect(HandLayout.fittedSpacing(3, geometry, 300), 60);
   });
 
+  test('selected cards use the raised hand baseline', () {
+    expect(
+      HandLayout.topPosition(selected: true, dragging: false),
+      lessThan(HandLayout.topPosition(selected: false, dragging: false)),
+    );
+    expect(HandLayout.topPosition(selected: true, dragging: false), -10);
+    expect(HandLayout.topPosition(selected: false, dragging: false), 0);
+  });
+
   test('fourteen cards fit with adaptive overlap', () {
     final geometry = CardGeometry.fromBoardConstraints(
       const BoxConstraints.tightFor(width: 390, height: 844),
