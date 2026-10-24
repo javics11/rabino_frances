@@ -11,6 +11,7 @@ import '../rules/rabino_rules.dart';
 import '../widgets/meld_orientation.dart';
 import '../widgets/card_widget.dart';
 import '../widgets/card_geometry.dart';
+import '../widgets/hand_layout.dart';
 
 class GameScreen extends StatefulWidget {
   final Game game;
@@ -158,10 +159,70 @@ class _GameScreenState extends State<GameScreen> {
               ((geometry.cardHeight - 4) / 3).clamp(26.0, 40.0).toDouble();
           final controlStyle = ElevatedButton.styleFrom(
             minimumSize: Size(0, controlHeight),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             visualDensity: VisualDensity.compact,
           );
+          final boardWidth = constraints.maxWidth;
+          final naturalHandWidth = HandLayout.fittedWidth(
+            player.hand.length,
+            geometry,
+            double.infinity,
+          );
+          const wideControlWidth = 96.0;
+          const narrowControlWidth = 60.0;
+          const compactControlWidth = 40.0;
+          bool fitsNaturalHand(double controlWidth) {
+            const gap = 8.0;
+            final handRight = boardWidth / 2 + naturalHandWidth / 2;
+            return handRight + gap <= boardWidth - controlWidth;
+          }
+
+          final wideControls = fitsNaturalHand(wideControlWidth);
+          final narrowControls =
+              !wideControls && fitsNaturalHand(narrowControlWidth);
+          final compactControls = !wideControls && !narrowControls;
+          final controlReserve = wideControls
+              ? wideControlWidth
+              : narrowControls
+                  ? narrowControlWidth
+                  : compactControlWidth;
+          final legacySortSuitLabel = compactControls
+              ? '♣'
+              : narrowControls
+                  ? 'Suit'
+                  : 'Sort Suit';
+          final legacySortRankLabel = compactControls
+              ? '↕'
+              : narrowControls
+                  ? 'Rank'
+                  : 'Sort Rank';
+          final clearLabel = compactControls ? '×' : 'Clear';
+          final sortSuitLabel = wideControls
+              ? 'Sort Suit'
+              : narrowControls
+                  ? 'Suit'
+                  : legacySortSuitLabel;
+          final sortRankLabel = wideControls
+              ? 'Sort Rank'
+              : narrowControls
+                  ? 'Rank'
+                  : legacySortRankLabel;
+          final displayedClearLabel = compactControls ? '×' : clearLabel;
+
+          double collisionAvailableWidth(
+            double naturalWidth,
+            double forbiddenLeft,
+          ) {
+            const gap = 8.0;
+            final naturalRight = boardWidth / 2 + naturalWidth / 2;
+            if (naturalRight + gap <= forbiddenLeft) return naturalWidth;
+            final maxCentered =
+                2 * (forbiddenLeft - gap - boardWidth / 2);
+            return naturalWidth < maxCentered
+                ? naturalWidth
+                : maxCentered.clamp(0, double.infinity).toDouble();
+          }
           return Column(
             children: [
           Expanded(
@@ -171,13 +232,31 @@ class _GameScreenState extends State<GameScreen> {
                 children: [
                   LayoutBuilder(
                     builder: (context, handConstraints) {
-                      final showTitle = handConstraints.maxWidth >= 560;
+                      final opponentMenuLeft = handConstraints.maxWidth - 52;
+                      final opponentNaturalWidth = HandLayout.fittedWidth(
+                        aiPlayer.hand.length,
+                        geometry,
+                        double.infinity,
+                      );
+                      final opponentSafeWidth = collisionAvailableWidth(
+                        opponentNaturalWidth,
+                        opponentMenuLeft,
+                      );
+                      final fittedHandWidth = HandLayout.fittedWidth(
+                        aiPlayer.hand.length,
+                        geometry,
+                        opponentSafeWidth,
+                      );
+                      final showTitle = fittedHandWidth / 2 + 158 <=
+                          handConstraints.maxWidth / 2;
                       final opponentHand = PlayerHandWidget(
+                        key: const ValueKey('opponent-hand-group'),
                         hand: aiPlayer.hand,
                         selectedIndexes: const {},
                         showFront: false,
                         geometry: geometry,
                         compactVertical: true,
+                        availableWidth: opponentSafeWidth,
                       );
                       return SizedBox(
                         key: const ValueKey('opponent-hand-band'),
@@ -238,21 +317,42 @@ class _GameScreenState extends State<GameScreen> {
                     ),
                   ),
 
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        widget.game.currentPlayerIndex == 0
-                            ? 'YOUR TURN'
-                            : 'AI TURN',
-                        key: const ValueKey('turn-indicator'),
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(width: 16),
-                      _buildDrawPile(geometry),
-                      const SizedBox(width: 40),
-                      _buildDiscardPile(geometry),
-                    ],
+                  SizedBox(
+                    height: geometry.cardHeight,
+                    child: Stack(
+                      children: [
+                        Center(
+                          child: Row(
+                            key: const ValueKey('draw-discard-group'),
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _buildDrawPile(geometry),
+                              const SizedBox(width: 40),
+                              _buildDiscardPile(geometry),
+                            ],
+                          ),
+                        ),
+                        Positioned(
+                          right: (boardWidth / 2) +
+                              (geometry.cardFootprintWidth * 2 + 40) / 2 +
+                              16,
+                          top: 0,
+                          bottom: 0,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              widget.game.currentPlayerIndex == 0
+                                  ? 'YOUR TURN'
+                                  : 'AI TURN',
+                              key: const ValueKey('turn-indicator'),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
 
                   Expanded(
@@ -362,18 +462,18 @@ class _GameScreenState extends State<GameScreen> {
                 Align(
                   alignment: Alignment.topCenter,
                   child: LayoutBuilder(
-                    builder: (context, constraints) =>
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              minWidth: constraints.maxWidth,
-                            ),
-                            child: Center(
-                              child: PlayerHandWidget(
+                    builder: (context, constraints) {
+                      final handWidth = collisionAvailableWidth(
+                        naturalHandWidth,
+                        boardWidth - controlReserve - 8,
+                      );
+                      return Center(
+                        child: PlayerHandWidget(
+                                key: const ValueKey('human-hand-group'),
                                 hand: player.hand,
                                 selectedIndexes: selectedCardIndexes,
                                 geometry: geometry,
+                                availableWidth: handWidth,
 
                                 onCardTapped: (index) {
                 if (widget.game.currentPlayerIndex != 0) {
@@ -506,30 +606,32 @@ class _GameScreenState extends State<GameScreen> {
                   return;
                 }
                                 },
-                              ),
-                            ),
-                          ),
                         ),
+                      );
+                    },
                   ),
                 ),
                 Positioned(
+                  key: const ValueKey('human-hand-controls'),
                   right: 0,
                   top: 0,
-                  child: Column(
+              child: SizedBox(
+                width: controlReserve,
+                child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     ElevatedButton(
                       key: const ValueKey('sort-suit-button'),
                       style: controlStyle,
                       onPressed: _sortBySuit,
-                      child: const Text("Sort Suit"),
+                      child: Text(sortSuitLabel),
                     ),
                     const SizedBox(height: 2),
                     ElevatedButton(
                       key: const ValueKey('sort-rank-button'),
                       style: controlStyle,
                       onPressed: _sortByRank,
-                      child: const Text("Sort Rank"),
+                      child: Text(sortRankLabel),
                     ),
                     const SizedBox(height: 2),
                     ElevatedButton(
@@ -542,10 +644,11 @@ class _GameScreenState extends State<GameScreen> {
                                 selectedCardIndexes.clear();
                               });
                             },
-                      child: const Text("Clear"),
+                      child: Text(displayedClearLabel),
                     ),
                   ],
                   ),
+                ),
                 ),
               ],
               ),

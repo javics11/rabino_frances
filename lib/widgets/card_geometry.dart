@@ -36,7 +36,7 @@ class CardGeometry {
   static CardGeometry fromBoardConstraints(BoxConstraints constraints) {
     final width = constraints.maxWidth.isFinite ? constraints.maxWidth : 800;
     final height = constraints.maxHeight.isFinite ? constraints.maxHeight : 800;
-    final widthBased = width * .17;
+    final widthBased = width * .15;
     final heightBased = (height - 406) / 4.5;
     final chosen = widthBased < heightBased ? widthBased : heightBased;
     return CardGeometry._(

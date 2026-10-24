@@ -19,6 +19,7 @@ class PlayerHandWidget extends StatefulWidget {
   final bool showFront;
   final CardGeometry geometry;
   final bool compactVertical;
+  final double? availableWidth;
 
   const PlayerHandWidget({
     super.key,
@@ -32,6 +33,7 @@ class PlayerHandWidget extends StatefulWidget {
     this.showFront = true,
     this.geometry = CardGeometry.desktop,
     this.compactVertical = false,
+    this.availableWidth,
   });
 
   @override
@@ -56,8 +58,14 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
       return 0;
     }
 
+    final step = HandLayout.fittedSpacing(
+      widget.hand.length,
+      widget.geometry,
+      widget.availableWidth ??
+          HandLayout.totalWidth(widget.hand.length, widget.geometry),
+    );
     final draggedCenter =
-        HandLayout.leftPosition(draggingIndex!, widget.geometry) +
+        draggingIndex! * step +
         dragOffset.dx +
         widget.geometry.cardWidth / 2;
 
@@ -65,7 +73,7 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
 
     while (insertIndex < widget.hand.length) {
       final cardCenter =
-          HandLayout.leftPosition(insertIndex, widget.geometry) +
+          insertIndex * step +
           widget.geometry.cardWidth / 2;
 
       if (draggedCenter < cardCenter) {
@@ -80,7 +88,18 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final totalWidth = HandLayout.totalWidth(widget.hand.length, widget.geometry);
+    final handWidth = widget.availableWidth ??
+        HandLayout.totalWidth(widget.hand.length, widget.geometry);
+    final step = HandLayout.fittedSpacing(
+      widget.hand.length,
+      widget.geometry,
+      handWidth,
+    );
+    final fittedWidth = HandLayout.fittedWidth(
+      widget.hand.length,
+      widget.geometry,
+      handWidth,
+    );
 
     gapIndex = draggingIndex == null ? null : _calculateGapIndex();
     final cardIndexes = List<int>.generate(widget.hand.length, (index) => index);
@@ -89,20 +108,20 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
       final isBeingDragged = draggingIndexes.contains(index);
 
       // Calculate where this card should be positioned
-      double left = HandLayout.leftPosition(index, widget.geometry);
+      double left = index * step;
 
       if (draggingIndex != null && gapIndex != null) {
         // Moving to the right
         if (gapIndex! > draggingIndex!) {
           if (index > draggingIndex! && index < gapIndex!) {
-            left -= HandLayout.spacingFor(widget.geometry);
+            left -= step;
           }
         }
 
         // Moving to the left
         if (gapIndex! < draggingIndex!) {
           if (index >= gapIndex! && index < draggingIndex!) {
-            left += HandLayout.spacingFor(widget.geometry);
+            left += step;
           }
         }
       }
@@ -117,8 +136,7 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
             ? dragStartLeft +
                   dragOffset.dx -
                   dragAnchorX +
-                  draggingIndexes.indexOf(index) *
-                      HandLayout.spacingFor(widget.geometry)
+                  draggingIndexes.indexOf(index) * step
             : left,
 
         top:
@@ -143,7 +161,7 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
                           setState(() {
                             draggingIndex = index;
                             dragStartLeft =
-                                HandLayout.leftPosition(index, widget.geometry);
+                                index * step;
                             gapIndex = index;
                             dragOffset = Offset.zero;
                             fingerPosition = details.globalPosition;
@@ -157,7 +175,7 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
 
                             dragAnchorX =
                                 (draggingIndexes.length - 1) *
-                                HandLayout.spacingFor(widget.geometry) /
+                                step /
                                 2;
                           });
                         }
@@ -278,10 +296,8 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
       height: widget.geometry.cardHeight,
       child: Align(
         alignment: Alignment.center,
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: SizedBox(
-            width: totalWidth,
+        child: SizedBox(
+            width: fittedWidth,
             height: widget.geometry.cardHeight,
             child: Stack(
               clipBehavior: Clip.none,
@@ -294,7 +310,6 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
                     .map(buildCard),
               ],
             ),
-          ),
         ),
       ),
     );

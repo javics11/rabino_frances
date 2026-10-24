@@ -52,7 +52,7 @@ void main() {
       const BoxConstraints.tightFor(width: 1280, height: 900),
     );
 
-    expect(phone.cardWidth, closeTo(66.3, 0.001));
+    expect(phone.cardWidth, closeTo(58.5, 0.001));
     expect(shortWindow.cardWidth, lessThan(phone.cardWidth));
     expect(shortWindow.cardHeight, closeTo(shortWindow.cardWidth * 1.5, 0.001));
     expect(desktop.cardWidth, CardGeometry.maxCardWidth);

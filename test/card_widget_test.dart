@@ -32,6 +32,14 @@ void main() {
       card.displaySuit,
     );
     expect(find.text(card.displaySuit), findsNWidgets(2));
+
+    final cornerRank = tester.getRect(
+      find.byKey(const ValueKey('card-corner-rank')),
+    );
+    final cornerSuit = tester.getRect(
+      find.byKey(const ValueKey('card-corner-suit')),
+    );
+    expect(cornerRank.bottom, lessThanOrEqualTo(cornerSuit.top));
   });
 
   testWidgets('Jokers show an unambiguous physical Joker corner identifier', (

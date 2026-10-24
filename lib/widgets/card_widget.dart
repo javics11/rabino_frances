@@ -45,9 +45,10 @@ class CardWidget extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                       ),
                     )
-                  : Row(
+                  : Column(
                       key: const ValueKey('card-corner-identifier'),
                       mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           card.shortRank,
@@ -57,7 +58,7 @@ class CardWidget extends StatelessWidget {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(width: 2),
+                        const SizedBox(height: 0),
                         Text(
                           card.displaySuit,
                           key: const ValueKey('card-corner-suit'),
