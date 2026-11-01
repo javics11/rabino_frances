@@ -3,20 +3,28 @@ import 'package:flutter/material.dart';
 import '../models/card.dart';
 import 'card_geometry.dart';
 
+enum CardCornerLayout { vertical, horizontal }
+
 class CardWidget extends StatelessWidget {
   final CardModel card;
   final bool selected;
   final CardGeometry geometry;
+  final CardCornerLayout cornerLayout;
 
   const CardWidget({
     super.key,
     required this.card,
     required this.selected,
     this.geometry = CardGeometry.desktop,
+    this.cornerLayout = CardCornerLayout.vertical,
   });
 
   @override
   Widget build(BuildContext context) {
+    final centralScale =
+        geometry.cardWidth / CardGeometry.maxCardWidth * .86;
+    final centralRankSize = 24 * centralScale;
+    final centralJokerSize = 36 * centralScale;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 150),
       width: geometry.cardWidth,
@@ -45,7 +53,29 @@ class CardWidget extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                       ),
                     )
-                  : Column(
+                  : cornerLayout == CardCornerLayout.horizontal
+                      ? Row(
+                          key: const ValueKey('card-corner-identifier'),
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              card.shortRank,
+                              key: const ValueKey('card-corner-rank'),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              card.displaySuit,
+                              key: const ValueKey('card-corner-suit'),
+                              style: const TextStyle(fontSize: 10),
+                            ),
+                          ],
+                        )
+                      : Column(
                       key: const ValueKey('card-corner-identifier'),
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -70,21 +100,21 @@ class CardWidget extends StatelessWidget {
           ),
           Center(
             child: card.isJoker
-                ? const Text('🃏', style: TextStyle(fontSize: 36))
+                ? Text('🃏', style: TextStyle(fontSize: centralJokerSize))
                 : Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
                         card.displayRank,
-                        style: const TextStyle(
-                          fontSize: 24,
+                        style: TextStyle(
+                          fontSize: centralRankSize,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: 8 * centralScale),
                       Text(
                         card.displaySuit,
-                        style: const TextStyle(fontSize: 24),
+                        style: TextStyle(fontSize: centralRankSize),
                       ),
                     ],
                   ),

@@ -5,6 +5,7 @@ import 'package:rabino_frances/screens/game_screen.dart';
 import 'package:rabino_frances/models/card.dart';
 import 'package:rabino_frances/models/deck.dart';
 import 'package:rabino_frances/models/game.dart';
+import 'package:rabino_frances/models/meld.dart';
 import 'package:rabino_frances/models/player.dart';
 import 'package:rabino_frances/models/spanish_suit.dart';
 import 'package:rabino_frances/services/game_factory.dart';
@@ -32,6 +33,25 @@ Game _gameWithFourteenHumanCards() {
       ),
     );
   }
+  return game;
+}
+
+Game _gameWithThreeCardMelds() {
+  final game = _gameWithFourteenHumanCards();
+  CardModel card(int id, int rank) => CardModel(
+        id: id,
+        rank: rank,
+        suit: SpanishSuit.bastos,
+      );
+  for (var index = 0; index < 14; index++) {
+    game.players.last.hand.add(card(500 + index, index % 13 + 1));
+  }
+  game.players.first.melds.add(
+    Meld(cards: [card(100, 1), card(101, 2), card(102, 3)]),
+  );
+  game.players.last.melds.add(
+    Meld(cards: [card(200, 1), card(201, 2), card(202, 3)]),
+  );
   return game;
 }
 
@@ -242,6 +262,35 @@ void main() {
       );
     }
     expect(find.byKey(const ValueKey('options-menu')), findsOneWidget);
+  });
+
+  testWidgets('vertical pressure shrinks compressible board roles first', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(home: GameScreen(game: _gameWithThreeCardMelds())),
+    );
+    await tester.pump();
+
+    final humanCard = tester.getSize(_humanCards().first).width;
+    final opponentCard = tester.getSize(find.byType(CardBackWidget).first).width;
+    final centreCardHeight =
+        tester.getSize(find.byKey(const ValueKey('draw-pile'))).height;
+
+    expect(opponentCard, lessThan(humanCard));
+    expect(
+      centreCardHeight,
+      lessThan(tester.getSize(_humanCards().first).height),
+    );
+    expect(
+      tester.getSize(find.byKey(const ValueKey('opponent-meld-area'))).height,
+      closeTo(
+        tester.getSize(find.byKey(const ValueKey('human-meld-area'))).height,
+        1.0,
+      ),
+    );
   });
 
   testWidgets('narrow controls are selected before hand compression', (

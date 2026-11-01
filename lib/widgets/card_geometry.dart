@@ -11,6 +11,10 @@ class CardGeometry {
 
   const CardGeometry._(this.cardWidth);
 
+  static CardGeometry fromWidth(double width) => CardGeometry._(
+        width.clamp(minCardWidth, maxCardWidth).toDouble(),
+      );
+
   double get cardHeight => cardWidth * cardAspectRatio;
   double get cardMargin => cardWidth / 20;
   double get cardFootprintWidth => cardWidth + cardMargin * 2;
@@ -41,6 +45,30 @@ class CardGeometry {
     final chosen = widthBased < heightBased ? widthBased : heightBased;
     return CardGeometry._(
       chosen.clamp(minCardWidth, maxCardWidth).toDouble(),
+    );
+  }
+
+  /// Derives one shared geometry for all melds in a table area.
+  ///
+  /// The longest meld determines the largest card size that can fit while
+  /// retaining the existing vertical exposure ratio.
+  static CardGeometry forMeldArea({
+    required double availableWidth,
+    required double availableHeight,
+    required int longestMeld,
+    double? maxCardWidth,
+  }) {
+    final areaWidthLimit = availableWidth.isFinite
+        ? (availableWidth * .15).clamp(minCardWidth, CardGeometry.maxCardWidth).toDouble()
+        : CardGeometry.maxCardWidth;
+    final widthLimit = maxCardWidth == null
+        ? areaWidthLimit
+        : areaWidthLimit.clamp(minCardWidth, maxCardWidth).toDouble();
+    final count = longestMeld < 1 ? 1 : longestMeld;
+    final fitWidth = availableHeight /
+        (cardAspectRatio * (1 + .20 * (count - 1)));
+    return CardGeometry._(
+      fitWidth.clamp(minCardWidth, widthLimit).toDouble(),
     );
   }
 }

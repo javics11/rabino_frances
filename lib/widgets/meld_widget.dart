@@ -62,6 +62,9 @@ class MeldWidget extends StatelessWidget {
                     card: meld.cards[index],
                     selected: false,
                     geometry: geometry,
+                    cornerLayout: isVertical
+                        ? CardCornerLayout.horizontal
+                        : CardCornerLayout.vertical,
                   ),
                 ),
               );

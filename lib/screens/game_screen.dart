@@ -12,6 +12,7 @@ import '../widgets/meld_orientation.dart';
 import '../widgets/card_widget.dart';
 import '../widgets/card_geometry.dart';
 import '../widgets/hand_layout.dart';
+import '../widgets/board_presentation_geometry.dart';
 
 class GameScreen extends StatefulWidget {
   final Game game;
@@ -171,7 +172,24 @@ class _GameScreenState extends State<GameScreen> {
     return Scaffold(
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final geometry = CardGeometry.fromBoardConstraints(constraints);
+          final presentationGeometry =
+              BoardPresentationGeometry.fromConstraints(
+            width: constraints.maxWidth,
+            height: constraints.maxHeight,
+            opponentLongestMeld: aiPlayer.melds.isEmpty
+                ? 0
+                : aiPlayer.melds
+                    .map((meld) => meld.cards.length)
+                    .reduce((a, b) => a > b ? a : b),
+            humanLongestMeld: player.melds.isEmpty
+                ? 0
+                : player.melds
+                    .map((meld) => meld.cards.length)
+                    .reduce((a, b) => a > b ? a : b),
+          );
+          final geometry = presentationGeometry.humanHand;
+          final opponentGeometry = presentationGeometry.opponentHand;
+          final centreGeometry = presentationGeometry.centre;
           final controlHeight =
               ((geometry.cardHeight - 4) / 3).clamp(26.0, 40.0).toDouble();
           final controlStyle = ElevatedButton.styleFrom(
@@ -252,7 +270,7 @@ class _GameScreenState extends State<GameScreen> {
                       final opponentMenuLeft = handConstraints.maxWidth - 52;
                       final opponentNaturalWidth = HandLayout.fittedWidth(
                         aiPlayer.hand.length,
-                        geometry,
+                        opponentGeometry,
                         double.infinity,
                       );
                       final opponentSafeWidth = collisionAvailableWidth(
@@ -261,7 +279,7 @@ class _GameScreenState extends State<GameScreen> {
                       );
                       final fittedHandWidth = HandLayout.fittedWidth(
                         aiPlayer.hand.length,
-                        geometry,
+                        opponentGeometry,
                         opponentSafeWidth,
                       );
                       final showTitle = fittedHandWidth / 2 + 158 <=
@@ -271,13 +289,13 @@ class _GameScreenState extends State<GameScreen> {
                         hand: aiPlayer.hand,
                         selectedIndexes: const {},
                         showFront: false,
-                        geometry: geometry,
+                        geometry: opponentGeometry,
                         compactVertical: true,
                         availableWidth: opponentSafeWidth,
                       );
                       return SizedBox(
                         key: const ValueKey('opponent-hand-band'),
-                        height: geometry.handHeight,
+                        height: opponentGeometry.handHeight,
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
@@ -318,24 +336,29 @@ class _GameScreenState extends State<GameScreen> {
                     },
                   ),
 
-                  Expanded(
+                  SizedBox(
+                    height: presentationGeometry.opponentMeldHeight,
                     child: ClipRect(
                       child: LayoutBuilder(
                         builder: (context, regionConstraints) =>
                             MeldAreaWidget(
+                              key: const ValueKey('opponent-meld-area'),
                               areaKey: aiMeldAreaKey,
                               melds: aiPlayer.melds,
                               emptyText: "AI MELDS",
                               orientation: meldOrientation,
-                              geometry: geometry,
+                              geometry: opponentGeometry,
                               availableHeight: regionConstraints.maxHeight,
+                              availableWidth: regionConstraints.maxWidth,
+                              maxCardWidth: presentationGeometry.table.cardWidth,
                             ),
                       ),
                     ),
                   ),
 
                   SizedBox(
-                    height: geometry.cardHeight,
+                    key: const ValueKey('centre-band'),
+                    height: centreGeometry.cardHeight,
                     child: Stack(
                       children: [
                         Center(
@@ -343,9 +366,9 @@ class _GameScreenState extends State<GameScreen> {
                             key: const ValueKey('draw-discard-group'),
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              _buildDrawPile(geometry),
+                              _buildDrawPile(centreGeometry),
                               const SizedBox(width: 40),
-                              _buildDiscardPile(geometry),
+                              _buildDiscardPile(centreGeometry),
                             ],
                           ),
                         ),
@@ -372,11 +395,13 @@ class _GameScreenState extends State<GameScreen> {
                     ),
                   ),
 
-                  Expanded(
+                  SizedBox(
+                    height: presentationGeometry.humanMeldHeight,
                     child: ClipRect(
                       child: LayoutBuilder(
                         builder: (context, regionConstraints) =>
                             MeldAreaWidget(
+                    key: const ValueKey('human-meld-area'),
                     areaKey: playerMeldAreaKey,
                     meldKeys: playerMeldKeys,
                     meldCardKeys: playerMeldCardKeys,
@@ -387,6 +412,8 @@ class _GameScreenState extends State<GameScreen> {
                     orientation: meldOrientation,
                     geometry: geometry,
                     availableHeight: regionConstraints.maxHeight,
+                    availableWidth: regionConstraints.maxWidth,
+                    maxCardWidth: presentationGeometry.table.cardWidth,
 
                     onMeldTapped: (meldIndex, position) {
                       if (selectedCardIndexes.isEmpty) {
@@ -699,6 +726,7 @@ class _GameScreenState extends State<GameScreen> {
               });
             },
       child: Container(
+        key: const ValueKey('draw-pile'),
         width: geometry.cardFootprintWidth,
         height: geometry.cardHeight,
         decoration: BoxDecoration(

@@ -3,9 +3,22 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rabino_frances/models/card.dart';
 import 'package:rabino_frances/models/spanish_suit.dart';
 import 'package:rabino_frances/widgets/card_widget.dart';
+import 'package:rabino_frances/widgets/card_geometry.dart';
 
 Widget _card(CardModel card) => MaterialApp(
       home: Scaffold(body: CardWidget(card: card, selected: false)),
+    );
+
+Widget _configuredCard(CardModel card, CardGeometry geometry, CardCornerLayout layout) =>
+    MaterialApp(
+      home: Scaffold(
+        body: CardWidget(
+          card: card,
+          selected: false,
+          geometry: geometry,
+          cornerLayout: layout,
+        ),
+      ),
     );
 
 void main() {
@@ -52,5 +65,62 @@ void main() {
     expect(find.text('🃏'), findsNWidgets(2));
     expect(find.text('JOKER'), findsNothing);
     expect(find.text('J'), findsNothing);
+  });
+
+  testWidgets('vertical meld corner identifiers use a horizontal layout', (
+    tester,
+  ) async {
+    const card = CardModel(id: 3, rank: 6, suit: SpanishSuit.bastos);
+    await tester.pumpWidget(
+      _configuredCard(
+        card,
+        CardGeometry.desktop,
+        CardCornerLayout.horizontal,
+      ),
+    );
+
+    expect(
+      tester.widget<Row>(find.byKey(const ValueKey('card-corner-identifier'))),
+      isA<Row>(),
+    );
+  });
+
+  testWidgets('central content scales while corner text stays readable', (
+    tester,
+  ) async {
+    const card = CardModel(id: 4, rank: 6, suit: SpanishSuit.bastos);
+    await tester.pumpWidget(
+      _configuredCard(card, CardGeometry.desktop, CardCornerLayout.vertical),
+    );
+    final largeCentralRank = tester.widget<Text>(
+      find.text(card.displayRank).last,
+    );
+    final largeCornerRank = tester.widget<Text>(
+      find.byKey(const ValueKey('card-corner-rank')),
+    );
+
+    await tester.pumpWidget(
+      _configuredCard(
+        card,
+        CardGeometry.forMeldArea(
+          availableWidth: 390,
+          availableHeight: 200,
+          longestMeld: 14,
+        ),
+        CardCornerLayout.vertical,
+      ),
+    );
+    final smallCentralRank = tester.widget<Text>(
+      find.text(card.displayRank).last,
+    );
+    final smallCornerRank = tester.widget<Text>(
+      find.byKey(const ValueKey('card-corner-rank')),
+    );
+
+    expect(
+      smallCentralRank.style!.fontSize,
+      lessThan(largeCentralRank.style!.fontSize!),
+    );
+    expect(smallCornerRank.style!.fontSize, largeCornerRank.style!.fontSize);
   });
 }
