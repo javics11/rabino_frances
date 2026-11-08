@@ -310,18 +310,18 @@ void main() {
   });
 
   test('Game selects and applies a unique left or right Joker alternative', () {
-    for (final leftSide in [true, false]) {
+    for (final before in [true, false]) {
       final game = Game(deck: Deck(), players: [Player('P'), Player('A')]);
       game.currentPlayer.melds.add(Meld(cards: [c(420, 6), c(421, 5), c(422, 4)]));
-      final joker = j(leftSide ? 423 : 424);
+      final joker = j(before ? 423 : 424);
       game.currentPlayer.hand.add(joker);
       final result = game.resolveAddCardsToMeld(0, [0])!;
-      final selected = game.selectMeldAdditionAlternative(0, result, leftSide);
+      final selected = game.selectMeldAdditionAlternative(0, result, before);
 
       expect(selected, isNotNull);
       expect(game.applyMeldAddition(0, [0], selected!), isTrue);
-      expect(game.currentPlayer.melds.single.cards.first.isJoker, leftSide);
-      expect(game.currentPlayer.melds.single.cards.last.isJoker, !leftSide);
+      expect(game.currentPlayer.melds.single.cards.first.isJoker, before);
+      expect(game.currentPlayer.melds.single.cards.last.isJoker, !before);
     }
   });
 

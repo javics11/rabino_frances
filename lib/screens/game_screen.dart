@@ -37,6 +37,7 @@ class _GameScreenState extends State<GameScreen> {
   int? hoveredMeldIndex;
   int? newMeldInsertionIndex;
   final MeldOrientation meldOrientation = MeldOrientation.vertical;
+  int _aiGeneration = 0;
 
   @override
   void initState() {
@@ -83,6 +84,16 @@ class _GameScreenState extends State<GameScreen> {
       context,
       MaterialPageRoute(builder: (_) => GameScreen(game: newGame)),
     );
+  }
+
+  void _undo() {
+    if (!gameService.undo()) return;
+    _aiGeneration++;
+    setState(() {
+      selectedCardIndexes.clear();
+      hoveredMeldIndex = null;
+      newMeldInsertionIndex = null;
+    });
   }
 
   void _updateHoveredMeld(Offset position) {
@@ -441,7 +452,7 @@ class _GameScreenState extends State<GameScreen> {
                               gameService.selectMeldAdditionAlternative(
                             meldIndex,
                             result,
-                            position.dx < meldRect.center.dx,
+                            meldOrientation.isBefore(position, meldRect),
                           );
                         }
                       }
@@ -502,6 +513,7 @@ class _GameScreenState extends State<GameScreen> {
               height: geometry.cardHeight,
               child: Stack(
                 alignment: Alignment.topCenter,
+                clipBehavior: Clip.none,
               children: [
                 Align(
                   alignment: Alignment.topCenter,
@@ -606,7 +618,7 @@ class _GameScreenState extends State<GameScreen> {
                       alternative = gameService.selectMeldAdditionAlternative(
                         meldIndex,
                         result,
-                        position.dx < meldRect.center.dx,
+                        meldOrientation.isBefore(position, meldRect),
                       );
                     }
                   }
@@ -689,6 +701,18 @@ class _GameScreenState extends State<GameScreen> {
                               });
                             },
                       child: Text(displayedClearLabel),
+                    ),
+                    const SizedBox(height: 2),
+                    ElevatedButton(
+                      key: const ValueKey('undo-button'),
+                      style: controlStyle,
+                      onPressed: gameService.canUndo ? _undo : null,
+                      child: compactControls
+                          ? const Tooltip(
+                              message: 'Undo',
+                              child: Icon(Icons.undo),
+                            )
+                          : const Text('Undo'),
                     ),
                   ],
                   ),
@@ -805,8 +829,9 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _playAiTurn() {
+    final generation = _aiGeneration;
     Future.delayed(const Duration(seconds: 1), () {
-      if (!mounted) return;
+      if (!mounted || generation != _aiGeneration) return;
 
       setState(() {
         aiService.playTurn();

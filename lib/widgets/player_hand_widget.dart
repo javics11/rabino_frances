@@ -52,6 +52,92 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
 
   /// Global position of the finger.
   Offset fingerPosition = Offset.zero;
+  OverlayEntry? _dragOverlayEntry;
+  Offset _dragPointerAnchor = Offset.zero;
+  RenderBox? _rootOverlayBox;
+  final Map<int, GlobalKey> _cardRenderKeys = {};
+
+  GlobalKey _cardRenderKey(int cardId) {
+    return _cardRenderKeys.putIfAbsent(cardId, GlobalKey.new);
+  }
+
+  void _showDragOverlay() {
+    final firstIndex = draggingIndexes.first;
+    final cardContext = _cardRenderKeys[widget.hand[firstIndex].id]
+        ?.currentContext;
+    final cardRenderObject = cardContext?.findRenderObject();
+    if (cardRenderObject is! RenderBox || !cardRenderObject.hasSize) return;
+
+    final cardTopLeft = cardRenderObject.localToGlobal(Offset.zero);
+    final overlay = Overlay.of(context, rootOverlay: true);
+    _rootOverlayBox = overlay.context.findRenderObject() as RenderBox?;
+    _dragPointerAnchor = fingerPosition - cardTopLeft;
+    _dragOverlayEntry = OverlayEntry(
+      builder: (context) => _buildDragOverlay(),
+    );
+    overlay.insert(_dragOverlayEntry!);
+  }
+
+  void _removeDragOverlay() {
+    _dragOverlayEntry?.remove();
+    _dragOverlayEntry = null;
+    _rootOverlayBox = null;
+  }
+
+  Widget _buildDragOverlay() {
+    final step = HandLayout.fittedSpacing(
+      widget.hand.length,
+      widget.geometry,
+      widget.availableWidth ??
+          HandLayout.totalWidth(widget.hand.length, widget.geometry),
+    );
+    final globalGroupTopLeft = fingerPosition - _dragPointerAnchor;
+    final groupTopLeft = _rootOverlayBox?.globalToLocal(globalGroupTopLeft) ??
+        globalGroupTopLeft;
+    final firstIndex = draggingIndexes.first;
+    final firstTop = HandLayout.topPosition(
+      selected: widget.selectedIndexes.contains(firstIndex),
+      dragging: true,
+    );
+
+    return IgnorePointer(
+      key: const ValueKey('drag-overlay'),
+      child: Stack(
+        children: [
+          for (int position = 0; position < draggingIndexes.length; position++)
+            Positioned(
+              left: groupTopLeft.dx + position * step,
+              top: groupTopLeft.dy +
+                  HandLayout.topPosition(
+                    selected: widget.selectedIndexes.contains(
+                      draggingIndexes[position],
+                    ),
+                    dragging: true,
+                  ) -
+                  firstTop,
+              child: AnimatedScale(
+                duration: Duration.zero,
+                scale: 1.08,
+                child: Material(
+                  color: Colors.transparent,
+                  elevation: 12,
+                  child: CardWidget(
+                    key: ValueKey(
+                      'drag-overlay-card-${draggingIndexes[position]}',
+                    ),
+                    card: widget.hand[draggingIndexes[position]],
+                    geometry: widget.geometry,
+                    selected: widget.selectedIndexes.contains(
+                      draggingIndexes[position],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
   int _calculateGapIndex() {
     if (draggingIndex == null) {
@@ -178,6 +264,7 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
                                 step /
                                 2;
                           });
+                          _showDragOverlay();
                         }
                       : null,
 
@@ -187,6 +274,7 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
                             dragOffset += details.delta;
                             fingerPosition = details.globalPosition;
                           });
+                          _dragOverlayEntry?.markNeedsBuild();
 
                           // The drag anchor is used only by the visual group
                           // positioning above. External targets must use the
@@ -260,6 +348,8 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
                             draggingIndexes.clear();
                           });
 
+                          _removeDragOverlay();
+
                           if (droppedCards.isNotEmpty &&
                               widget.onCardDropped != null) {
                             widget.onCardDropped!(droppedCards, dropPosition);
@@ -269,20 +359,40 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
                         }
                       : null,
 
+                  onPanCancel: widget.showFront
+                      ? () {
+                          _removeDragOverlay();
+                          setState(() {
+                            draggingIndex = null;
+                            gapIndex = null;
+                            dragOffset = Offset.zero;
+                            fingerPosition = Offset.zero;
+                            draggingIndexes.clear();
+                          });
+                          widget.onCardDragEnded?.call();
+                        }
+                      : null,
+
                   child: AnimatedScale(
                     duration: const Duration(milliseconds: 120),
                     scale: isBeingDragged ? 1.08 : 1.0,
-                    child: Material(
+                    child: draggingIndexes.contains(index)
+                        ? const SizedBox.shrink()
+                        : Material(
                       color: Colors.transparent,
                       elevation: isBeingDragged ? 12 : 0,
                       child: widget.showFront
                           ? CardWidget(
+                              key: _cardRenderKey(widget.hand[index].id),
                               card: widget.hand[index],
                               geometry: widget.geometry,
                               selected: widget.selectedIndexes.contains(index),
                             )
-                          : CardBackWidget(geometry: widget.geometry),
-                    ),
+                          : CardBackWidget(
+                              key: _cardRenderKey(widget.hand[index].id),
+                              geometry: widget.geometry,
+                            ),
+                          ),
                   ),
                 ),
               ),
@@ -313,6 +423,12 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _removeDragOverlay();
+    super.dispose();
   }
 
   bool _isGlobalPositionInsideHand(Offset position) {

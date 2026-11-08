@@ -20,6 +20,46 @@ Widget _testApp(Widget child) {
 }
 
 void main() {
+  testWidgets('active hand drag is projected into the top overlay layer', (
+    tester,
+  ) async {
+    final hand = _cards(2);
+
+    await tester.pumpWidget(
+      _testApp(
+        PlayerHandWidget(
+          hand: hand,
+          selectedIndexes: const {},
+          onCardDragUpdated: (_) {},
+          onCardDragEnded: () {},
+        ),
+      ),
+    );
+
+    final cardFinder = find.byKey(ValueKey(hand.first.id));
+    final initialCardRect = tester.getRect(cardFinder);
+    final start = initialCardRect.topLeft + const Offset(20, 30);
+    final gesture = await tester.startGesture(
+      start,
+    );
+    await gesture.moveBy(const Offset(12, 12));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('drag-overlay')), findsOneWidget);
+
+    final firstOverlayRect = tester.getRect(
+      find.byKey(const ValueKey('drag-overlay-card-0')),
+    );
+    final pointerAfterStart = start + const Offset(12, 12);
+    final expectedAnchor = start - initialCardRect.center;
+    final actualAnchor = pointerAfterStart - firstOverlayRect.center;
+    expect(actualAnchor.dx, closeTo(expectedAnchor.dx, 1));
+    expect(actualAnchor.dy, closeTo(expectedAnchor.dy, 1));
+
+    await gesture.up();
+    await tester.pump();
+    expect(find.byKey(const ValueKey('drag-overlay')), findsNothing);
+  });
+
   testWidgets('fixed meld geometry remains unchanged', (
     tester,
   ) async {

@@ -32,6 +32,52 @@ void main() {
     expect(game.currentPlayer.hand.length, initialHandSize);
   });
 
+  test('undo restores a deep snapshot including meld assignments', () {
+    final joker = CardModel(id: 900, isJoker: true);
+    final meld = Meld(
+      cards: [testCard(901, 5), joker, testCard(902, 7)],
+      jokerAssignments: {
+        900: const JokerAssignment(
+          jokerId: 900,
+          rank: 6,
+          suit: SpanishSuit.bastos,
+        ),
+      },
+    );
+    game.currentPlayer.melds.add(meld);
+    game.currentPlayer.hand.add(testCard(903, 8));
+    final snapshot = game.deepCopy();
+
+    game.currentPlayer.hand.clear();
+    game.currentPlayer.melds.single.cards.clear();
+    game.currentPlayer.melds.single.jokerAssignments.clear();
+
+    expect(snapshot.currentPlayer.hand, hasLength(1));
+    expect(snapshot.currentPlayer.melds.single.cards.map((card) => card.id),
+        [901, 900, 902]);
+    expect(snapshot.currentPlayer.melds.single.jokerAssignments[900]!.rank, 6);
+  });
+
+  test('successful actions create at most five undo snapshots', () {
+    game.firstTurnOfRound = false;
+    for (int action = 0; action < 6; action++) {
+      game.hasDrawnThisTurn = false;
+      expect(gameService.drawFromDeck(), isTrue);
+    }
+
+    expect(gameService.undoHistoryLength, GameService.maxUndoHistory);
+    expect(gameService.canUndo, isTrue);
+    for (int action = 0; action < GameService.maxUndoHistory; action++) {
+      expect(gameService.undo(), isTrue);
+    }
+    expect(gameService.canUndo, isFalse);
+  });
+
+  test('rejected actions do not create undo snapshots', () {
+    expect(gameService.createMeld([0, 1, 2]), isFalse);
+    expect(gameService.canUndo, isFalse);
+  });
+
   test('Drawing from the deck adds one card', () {
     game.firstTurnOfRound = false;
     final initialHandSize = game.currentPlayer.hand.length;

@@ -4,9 +4,26 @@ import '../rules/rabino_rules.dart';
 import 'sort_service.dart';
 
 class GameService {
+  static const int maxUndoHistory = 5;
   final Game game;
+  final List<Game> _undoHistory = [];
 
   GameService({required this.game});
+
+  bool get canUndo => _undoHistory.isNotEmpty;
+
+  int get undoHistoryLength => _undoHistory.length;
+
+  bool undo() {
+    if (_undoHistory.isEmpty) return false;
+    game.restoreFrom(_undoHistory.removeLast());
+    return true;
+  }
+
+  void _record(Game snapshot) {
+    if (_undoHistory.length == maxUndoHistory) _undoHistory.removeAt(0);
+    _undoHistory.add(snapshot);
+  }
 
   bool drawFromDeck() {
     if (!game.canDraw()) {
@@ -17,7 +34,9 @@ class GameService {
       return false;
     }
 
+    final snapshot = game.deepCopy();
     game.drawCard();
+    _record(snapshot);
 
     return true;
   }
@@ -31,7 +50,9 @@ class GameService {
       return false;
     }
 
+    final snapshot = game.deepCopy();
     game.drawFromDiscard();
+    _record(snapshot);
 
     return true;
   }
@@ -47,23 +68,31 @@ class GameService {
       return false;
     }
 
+    final snapshot = game.deepCopy();
     game.discardCard(index);
+    _record(snapshot);
 
     return true;
   }
 
   bool createMeld(List<int> handIndexes, {int? insertionIndex}) {
-    return game.createMeld(handIndexes, insertionIndex: insertionIndex);
+    final snapshot = game.deepCopy();
+    final success = game.createMeld(handIndexes, insertionIndex: insertionIndex);
+    if (success) _record(snapshot);
+    return success;
   }
 
   MeldCreationResult createMeldResult(
     List<int> handIndexes, {
     int? insertionIndex,
   }) {
-    return game.createMeldResult(
+    final snapshot = game.deepCopy();
+    final result = game.createMeldResult(
       handIndexes,
       insertionIndex: insertionIndex,
     );
+    if (result.success) _record(snapshot);
+    return result;
   }
 
   bool addCardsToMeld(
@@ -71,11 +100,14 @@ class GameService {
     List<int> handIndexes, {
     int? insertionIndex,
   }) {
-    return game.addCardsToMeld(
+    final snapshot = game.deepCopy();
+    final success = game.addCardsToMeld(
       meldIndex,
       handIndexes,
       insertionIndex: insertionIndex,
     );
+    if (success) _record(snapshot);
+    return success;
   }
 
   MeldAdditionResult? resolveAddCardsToMeld(
@@ -90,15 +122,18 @@ class GameService {
     List<int> handIndexes,
     MeldAdditionAlternative alternative,
   ) {
-    return game.applyMeldAddition(meldIndex, handIndexes, alternative);
+    final snapshot = game.deepCopy();
+    final success = game.applyMeldAddition(meldIndex, handIndexes, alternative);
+    if (success) _record(snapshot);
+    return success;
   }
 
   MeldAdditionAlternative? selectMeldAdditionAlternative(
     int meldIndex,
     MeldAdditionResult result,
-    bool leftSide,
+    bool before,
   ) {
-    return game.selectMeldAdditionAlternative(meldIndex, result, leftSide);
+    return game.selectMeldAdditionAlternative(meldIndex, result, before);
   }
 
   void sortCurrentPlayerByRank() {

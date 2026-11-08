@@ -25,6 +25,44 @@ class Game {
 
   Game({required this.deck, required this.players});
 
+  Game deepCopy() {
+    final copiedDeck = Deck()..cards.clear();
+    copiedDeck.cards.addAll(deck.cards);
+    return Game(
+      deck: copiedDeck,
+      players: players.map(_copyPlayer).toList(),
+    )
+      ..discardPile.addAll(discardPile)
+      ..currentPlayerIndex = currentPlayerIndex
+      ..firstTurnOfRound = firstTurnOfRound
+      ..hasDrawnThisTurn = hasDrawnThisTurn;
+  }
+
+  void restoreFrom(Game snapshot) {
+    deck.cards
+      ..clear()
+      ..addAll(snapshot.deck.cards);
+    players
+      ..clear()
+      ..addAll(snapshot.players.map(_copyPlayer));
+    discardPile
+      ..clear()
+      ..addAll(snapshot.discardPile);
+    currentPlayerIndex = snapshot.currentPlayerIndex;
+    firstTurnOfRound = snapshot.firstTurnOfRound;
+    hasDrawnThisTurn = snapshot.hasDrawnThisTurn;
+  }
+
+  static Player _copyPlayer(Player source) {
+    final copy = Player(source.name)..hasOpened = source.hasOpened;
+    copy.hand.addAll(source.hand);
+    copy.melds.addAll(source.melds.map((meld) => Meld(
+          cards: List.of(meld.cards),
+          jokerAssignments: meld.jokerAssignments,
+        )));
+    return copy;
+  }
+
   void dealCards() {
     for (int i = 0; i < 14; i++) {
       for (final player in players) {
@@ -298,7 +336,7 @@ class Game {
   MeldAdditionAlternative? selectMeldAdditionAlternative(
     int meldIndex,
     MeldAdditionResult result,
-    bool leftSide,
+    bool before,
   ) {
     if (meldIndex < 0 || meldIndex >= currentPlayer.melds.length) return null;
     final existingIds = currentPlayer.melds[meldIndex].cards.map((card) => card.id).toSet();
@@ -312,7 +350,7 @@ class Game {
       if (retainedPositions.isEmpty) return false;
       final isLeft = retainedPositions.first > 0;
       final isRight = retainedPositions.last < alternative.cards.length - 1;
-      return leftSide ? isLeft && !isRight : isRight && !isLeft;
+      return before ? isLeft && !isRight : isRight && !isLeft;
     }).toList();
     return matches.length == 1 ? matches.single : null;
   }
