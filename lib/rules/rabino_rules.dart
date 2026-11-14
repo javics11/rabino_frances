@@ -161,7 +161,12 @@ class RabinoRules {
       CardModel? match;
       for (final card in existing) {
         final represented = card.isJoker ? assignments[card.id]?.rank : card.rank;
-        if (represented == rank && !used.contains(card)) {
+        final isNaturalAceInFullRun =
+            ranks.length == 14 && rank == 1 && !card.isJoker;
+        final isDuplicateAceSlot = descending ? index == 0 : index == 13;
+        if (represented == rank &&
+            !used.contains(card) &&
+            !(isNaturalAceInFullRun && isDuplicateAceSlot)) {
           match = card;
           break;
         }
@@ -281,23 +286,40 @@ class RabinoRules {
       for (int start = 1; start <= 13; start++) {
         final ranks = _sequence(start, cards.length, descending);
         if (ranks == null) continue;
-        final byRank = <int, CardModel>{};
+        final byRank = <int, List<CardModel>>{};
         var duplicate = false;
         for (final card in natural) {
-          if (card.rank == null || byRank.containsKey(card.rank)) {
+          if (card.rank == null) {
             duplicate = true;
             break;
           }
-          byRank[card.rank!] = card;
+          final cardsForRank = byRank.putIfAbsent(card.rank!, () => []);
+          cardsForRank.add(card);
+          if (cardsForRank.length > 1 &&
+              !(cards.length == 14 && card.rank == 1 &&
+                  cardsForRank.length == 2)) {
+            duplicate = true;
+            break;
+          }
         }
         if (duplicate || byRank.keys.any((rank) => !ranks.contains(rank))) continue;
 
         final ordered = <CardModel>[];
+        final remainingByRank = <int, List<CardModel>>{
+          for (final entry in byRank.entries) entry.key: List.of(entry.value),
+        };
         final remainingJokers = cards.where((card) => card.isJoker).toList();
-        for (final rank in ranks) {
-          final naturalCard = byRank[rank];
-          if (naturalCard != null) {
-            ordered.add(naturalCard);
+        for (int index = 0; index < ranks.length; index++) {
+          final rank = ranks[index];
+          final naturalCards = remainingByRank[rank];
+          final reserveNaturalAce = cards.length == 14 &&
+              rank == 1 &&
+              remainingJokers.isNotEmpty &&
+              ((descending && index == 0) || (!descending && index == 13));
+          if (naturalCards != null &&
+              naturalCards.isNotEmpty &&
+              !reserveNaturalAce) {
+            ordered.add(naturalCards.removeAt(0));
           } else if (remainingJokers.isNotEmpty) {
             ordered.add(remainingJokers.removeAt(0));
           } else {
@@ -323,12 +345,13 @@ class RabinoRules {
           explicitCards = canonicalOrdered;
           explicitAssignments = resolved.jokerAssignments;
         }
-        final orderedKey = canonicalOrdered.map((card) => card.id).join(',');
-        final assignmentKey = resolved.jokerAssignments.entries
-            .map((entry) => '${entry.key}:${entry.value.rank}:${entry.value.suit}')
-            .toList()
-          ..sort();
-        final semanticKey = '$orderedKey|${assignmentKey.join(',')}';
+        final semanticKey = canonicalOrdered.map((card) {
+          if (!card.isJoker) {
+            return 'natural:${card.rank}:${card.suit}';
+          }
+          final assignment = resolved.jokerAssignments[card.id];
+          return 'joker:${assignment?.rank}:${assignment?.suit}';
+        }).join('|');
         if (!seen.add(semanticKey)) continue;
         candidates.add(canonicalOrdered);
         assignments.add(resolved.jokerAssignments);
@@ -432,6 +455,10 @@ class RabinoRules {
   }
 
   static List<int>? _sequence(int start, int length, bool descending) {
+    if (start == 1 && length == 14) {
+      final complete = [1, ...List<int>.generate(12, (index) => 13 - index), 1];
+      return descending ? complete : complete.reversed.toList();
+    }
     final regular = List<int>.generate(length, (index) => start + index);
     if (regular.last <= 13) {
       return descending ? regular.reversed.toList() : regular;

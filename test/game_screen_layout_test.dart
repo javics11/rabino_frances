@@ -11,6 +11,8 @@ import 'package:rabino_frances/models/spanish_suit.dart';
 import 'package:rabino_frances/services/game_factory.dart';
 import 'package:rabino_frances/widgets/card_widget.dart';
 import 'package:rabino_frances/widgets/card_back_widget.dart';
+import 'package:rabino_frances/widgets/meld_area_widget.dart';
+import 'package:rabino_frances/widgets/meld_orientation.dart';
 
 Rect _union(Iterable<Rect> rects) {
   final list = rects.toList();
@@ -111,6 +113,61 @@ Rect _humanCardRectById(WidgetTester tester, int cardId) {
 }
 
 void main() {
+  testWidgets('meld orientation toggle is presentation-only and survives new game', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(home: GameScreen(game: GameFactory.createInitialGame())),
+    );
+    await tester.pump();
+
+    List<MeldAreaWidget> meldAreas() => tester
+        .widgetList<MeldAreaWidget>(find.byType(MeldAreaWidget))
+        .toList();
+
+    expect(
+      meldAreas().every((area) => area.orientation == MeldOrientation.vertical),
+      isTrue,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('options-menu')));
+    await tester.pumpAndSettle();
+    expect(find.text('Horizontal'), findsOneWidget);
+    await tester.tap(find.text('Horizontal'));
+    await tester.pumpAndSettle();
+
+    expect(
+      meldAreas().every((area) => area.orientation == MeldOrientation.horizontal),
+      isTrue,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('options-menu')));
+    await tester.pumpAndSettle();
+    expect(find.text('Vertical'), findsOneWidget);
+    await tester.tap(find.text('Vertical'));
+    await tester.pumpAndSettle();
+    expect(
+      meldAreas().every((area) => area.orientation == MeldOrientation.vertical),
+      isTrue,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('options-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Horizontal'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('options-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('New Game'));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widgetList<MeldAreaWidget>(find.byType(MeldAreaWidget))
+          .every((area) => area.orientation == MeldOrientation.horizontal),
+      isTrue,
+    );
+  });
+
   testWidgets('compact board places title and turn in shared regions', (
     tester,
   ) async {

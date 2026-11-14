@@ -16,8 +16,13 @@ import '../widgets/board_presentation_geometry.dart';
 
 class GameScreen extends StatefulWidget {
   final Game game;
+  final MeldOrientation initialMeldOrientation;
 
-  const GameScreen({super.key, required this.game});
+  const GameScreen({
+    super.key,
+    required this.game,
+    this.initialMeldOrientation = MeldOrientation.vertical,
+  });
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -38,16 +43,30 @@ class _GameScreenState extends State<GameScreen> {
   bool? hoveredMeldBefore;
   int? newMeldInsertionIndex;
   List<int>? _activeDragHandIndexes;
-  final MeldOrientation meldOrientation = MeldOrientation.vertical;
+  late MeldOrientation meldOrientation;
   int _aiGeneration = 0;
 
   @override
   void initState() {
     super.initState();
 
+    meldOrientation = widget.initialMeldOrientation;
+
     gameService = GameService(game: widget.game);
 
     aiService = AiService(game: widget.game);
+  }
+
+  void _toggleMeldOrientation() {
+    setState(() {
+      meldOrientation = meldOrientation == MeldOrientation.vertical
+          ? MeldOrientation.horizontal
+          : MeldOrientation.vertical;
+      hoveredMeldIndex = null;
+      hoveredMeldBefore = null;
+      newMeldInsertionIndex = null;
+      _activeDragHandIndexes = null;
+    });
   }
 
   void _sortByRank() {
@@ -84,7 +103,12 @@ class _GameScreenState extends State<GameScreen> {
 
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => GameScreen(game: newGame)),
+      MaterialPageRoute(
+        builder: (_) => GameScreen(
+          game: newGame,
+          initialMeldOrientation: meldOrientation,
+        ),
+      ),
     );
   }
 
@@ -359,11 +383,22 @@ class _GameScreenState extends State<GameScreen> {
                                 padding: EdgeInsets.zero,
                                 onSelected: (value) {
                                   if (value == 'new_game') _newGame();
+                                  if (value == 'toggle_orientation') {
+                                    _toggleMeldOrientation();
+                                  }
                                 },
-                                itemBuilder: (context) => const [
-                                  PopupMenuItem(
+                                itemBuilder: (context) => [
+                                  const PopupMenuItem(
                                     value: 'new_game',
                                     child: Text('New Game'),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'toggle_orientation',
+                                    child: Text(
+                                      meldOrientation == MeldOrientation.vertical
+                                          ? 'Horizontal'
+                                          : 'Vertical',
+                                    ),
                                   ),
                                 ],
                               ),
@@ -388,7 +423,9 @@ class _GameScreenState extends State<GameScreen> {
                               geometry: opponentGeometry,
                               availableHeight: regionConstraints.maxHeight,
                               availableWidth: regionConstraints.maxWidth,
-                              maxCardWidth: presentationGeometry.table.cardWidth,
+                              maxCardWidth: meldOrientation == MeldOrientation.vertical
+                                  ? presentationGeometry.table.cardWidth
+                                  : null,
                             ),
                       ),
                     ),
@@ -452,7 +489,9 @@ class _GameScreenState extends State<GameScreen> {
                     geometry: geometry,
                     availableHeight: regionConstraints.maxHeight,
                     availableWidth: regionConstraints.maxWidth,
-                    maxCardWidth: presentationGeometry.table.cardWidth,
+                    maxCardWidth: meldOrientation == MeldOrientation.vertical
+                        ? presentationGeometry.table.cardWidth
+                        : null,
 
                     onMeldTapped: (meldIndex, position) {
                       if (selectedCardIndexes.isEmpty) {

@@ -27,43 +27,45 @@ final class MeldDisplayHiddenSpan extends MeldDisplayItem {
 
 final class MeldDisplayProjection {
   final List<MeldDisplayItem> items;
-  final double cardHeight;
-  final double verticalExposedHeight;
+  final double cardExtent;
+  final double exposedExtent;
 
   const MeldDisplayProjection({
     required this.items,
-    required this.cardHeight,
-    required this.verticalExposedHeight,
+    required this.cardExtent,
+    required this.exposedExtent,
   });
 
   int get displayItemCount => items.length;
 
-  double get height => displayItemCount == 0
+  double get extent => displayItemCount == 0
       ? 0
-      : cardHeight + (displayItemCount - 1) * verticalExposedHeight;
+      : cardExtent + (displayItemCount - 1) * exposedExtent;
+
+  double get height => extent;
 }
 
 MeldDisplayProjection projectMeldForDisplay({
   required Meld meld,
-  required bool isVertical,
-  required double availableHeight,
-  required double cardHeight,
-  required double verticalExposedHeight,
+  required bool compressionEnabled,
+  required double availableExtent,
+  required double cardExtent,
+  required double exposedExtent,
 }) {
   final allIndexes = <int>{
     for (var index = 0; index < meld.cards.length; index++) index,
   };
 
-  if (!isVertical ||
+  if (!compressionEnabled ||
       meld.cards.length < 2 ||
-      _fullHeight(meld.cards.length, cardHeight, verticalExposedHeight) <=
-          availableHeight ||
+      _fullExtent(meld.cards.length, cardExtent, exposedExtent) <=
+          availableExtent ||
       RabinoRules.validateMeld(meld).type != RabinoMeldValidation.validRun) {
     return _projectionForIndexes(
       meld,
       allIndexes,
-      cardHeight,
-      verticalExposedHeight,
+      cardExtent,
+      exposedExtent,
     );
   }
 
@@ -78,19 +80,19 @@ MeldDisplayProjection projectMeldForDisplay({
   return _projectionForIndexes(
     meld,
     protected,
-    cardHeight,
-    verticalExposedHeight,
+    cardExtent,
+    exposedExtent,
   );
 }
 
-double _fullHeight(int count, double cardHeight, double exposedHeight) =>
-    cardHeight + (count - 1) * exposedHeight;
+double _fullExtent(int count, double cardExtent, double exposedExtent) =>
+    cardExtent + (count - 1) * exposedExtent;
 
 MeldDisplayProjection _projectionForIndexes(
   Meld meld,
   Set<int> visibleIndexes,
-  double cardHeight,
-  double verticalExposedHeight,
+  double cardExtent,
+  double exposedExtent,
 ) {
   final items = <MeldDisplayItem>[];
   var index = 0;
@@ -109,7 +111,7 @@ MeldDisplayProjection _projectionForIndexes(
   }
   return MeldDisplayProjection(
     items: List.unmodifiable(items),
-    cardHeight: cardHeight,
-    verticalExposedHeight: verticalExposedHeight,
+    cardExtent: cardExtent,
+    exposedExtent: exposedExtent,
   );
 }

@@ -5,6 +5,7 @@ import 'meld_widget.dart';
 import 'meld_orientation.dart';
 import 'card_geometry.dart';
 import 'meld_display_projection.dart';
+import 'horizontal_meld_layout.dart';
 
 class MeldAreaWidget extends StatelessWidget {
   static const double topInset = 2.5;
@@ -73,6 +74,18 @@ class MeldAreaWidget extends StatelessWidget {
         : geometry;
     final verticalCardFaceWidth =
         tableGeometry.cardWidth - 2 * tableGeometry.cardMargin;
+    final horizontalLayout = orientation == MeldOrientation.horizontal &&
+            melds.isNotEmpty &&
+            (availableWidth ?? double.infinity).isFinite
+        ? calculateHorizontalMeldLayout(
+            melds: melds,
+            availableWidth: ((availableWidth ?? 0) - 2 * borderWidth)
+                .clamp(0, double.infinity)
+                .toDouble(),
+            availableHeight: contentAvailableHeight,
+            maxCardWidth: maxCardWidth ?? CardGeometry.maxCardWidth,
+          )
+        : null;
     final contentHeight = orientation == MeldOrientation.vertical && melds.isNotEmpty
         ? melds
               .map((meld) => tableGeometry.verticalMeldHeight(meld.cards.length))
@@ -111,6 +124,13 @@ class MeldAreaWidget extends StatelessWidget {
                   ),
                 ),
               )
+            else if (horizontalLayout != null)
+              _buildHorizontalLayout(
+                layout: horizontalLayout,
+                contentWidth: ((availableWidth ?? 0) - 2 * borderWidth)
+                    .clamp(0, double.infinity)
+                    .toDouble(),
+              )
             else
               Align(
                 alignment: Alignment.topCenter,
@@ -133,10 +153,10 @@ class MeldAreaWidget extends StatelessWidget {
                                         MeldOrientation.vertical
                                     ? projectMeldForDisplay(
                                         meld: melds[index],
-                                        isVertical: true,
-                                        availableHeight: contentAvailableHeight,
-                                        cardHeight: tableGeometry.cardHeight,
-                                        verticalExposedHeight:
+                                        compressionEnabled: true,
+                                        availableExtent: contentAvailableHeight,
+                                        cardExtent: tableGeometry.cardHeight,
+                                        exposedExtent:
                                             tableGeometry.verticalExposedHeight,
                                       )
                                     : null;
@@ -281,6 +301,114 @@ class MeldAreaWidget extends StatelessWidget {
                     ),
                   ),
                 ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHorizontalLayout({
+    required HorizontalMeldLayout layout,
+    required double contentWidth,
+  }) {
+    final geometry = layout.geometry;
+    final contentHeight = layout.rowCount * geometry.cardHeight +
+        (layout.rowCount > 1 ? horizontalMeldRowGap : 0);
+    final showInsertionIndicator = layout.rowCount == 1 &&
+        newMeldInsertionIndex != null &&
+        newMeldInsertionIndex! <= layout.items.length;
+    final insertionX = showInsertionIndicator
+        ? newMeldInsertionIndex! == layout.items.length
+            ? layout.items.last.x + layout.items.last.width
+            : layout.items[newMeldInsertionIndex!].x
+        : null;
+
+    return Align(
+      alignment: Alignment.topCenter,
+      child: SizedBox(
+        width: contentWidth,
+        height: contentHeight,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            for (final item in layout.items)
+              Positioned(
+                left: ((contentWidth - layout.rowWidths[item.rowIndex]) / 2)
+                        .clamp(0, double.infinity)
+                        .toDouble() +
+                    item.x,
+                top: item.rowIndex * (geometry.cardHeight + horizontalMeldRowGap),
+                width: item.width,
+                height: geometry.cardHeight,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned.fill(
+                      key: ValueKey('meld-hover-highlight-${item.meldIndex}'),
+                      child: IgnorePointer(
+                        child: ColoredBox(
+                          color: hoveredMeldIndex == item.meldIndex
+                              ? Colors.lightGreenAccent.withValues(alpha: 0.45)
+                              : Colors.transparent,
+                        ),
+                      ),
+                    ),
+                    MeldWidget(
+                      meldKey: meldKeys != null
+                          ? meldKeys![item.meldIndex]
+                          : null,
+                      meld: melds[item.meldIndex],
+                      orientation: MeldOrientation.horizontal,
+                      geometry: geometry,
+                      projection: item.projection,
+                      cardKeys: meldCardKeys != null
+                          ? meldCardKeys![item.meldIndex]
+                          : null,
+                      onTap: onMeldTapped == null
+                          ? null
+                          : (position) =>
+                              onMeldTapped!(item.meldIndex, position),
+                    ),
+                    Positioned.fill(
+                      key: ValueKey('meld-hover-border-${item.meldIndex}'),
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: hoveredMeldIndex == item.meldIndex
+                                  ? Colors.green.shade900
+                                  : Colors.transparent,
+                              width: 3,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (hoveredMeldIndex == item.meldIndex &&
+                        hoveredMeldBefore != null)
+                      Positioned(
+                        key: ValueKey(
+                          'meld-directional-highlight-${item.meldIndex}',
+                        ),
+                        left: hoveredMeldBefore == true ? 0 : null,
+                        right: hoveredMeldBefore == false ? 0 : null,
+                        top: 0,
+                        bottom: 0,
+                        width: 8,
+                        child: IgnorePointer(
+                          child: ColoredBox(color: Colors.green.shade900),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            if (insertionX != null)
+              Positioned(
+                left: insertionX,
+                top: 0,
+                child: const _MeldInsertionIndicator(),
               ),
           ],
         ),

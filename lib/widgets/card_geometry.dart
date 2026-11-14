@@ -11,8 +11,12 @@ class CardGeometry {
 
   const CardGeometry._(this.cardWidth);
 
-  static CardGeometry fromWidth(double width) => CardGeometry._(
-        width.clamp(minCardWidth, maxCardWidth).toDouble(),
+  static CardGeometry fromWidth(
+    double width, {
+    bool allowBelowMinimum = false,
+  }) => CardGeometry._(
+        width.clamp(allowBelowMinimum ? 1 : minCardWidth, maxCardWidth)
+            .toDouble(),
       );
 
   double get cardHeight => cardWidth * cardAspectRatio;

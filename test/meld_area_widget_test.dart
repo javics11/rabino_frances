@@ -159,10 +159,10 @@ void main() {
     final cardKeys = List<GlobalKey>.generate(9, (_) => GlobalKey());
     final projection = projectMeldForDisplay(
       meld: meld,
-      isVertical: true,
-      availableHeight: 120,
-      cardHeight: 80,
-      verticalExposedHeight: 16,
+      compressionEnabled: true,
+      availableExtent: 120,
+      cardExtent: 80,
+      exposedExtent: 16,
     );
 
     await tester.pumpWidget(
@@ -215,12 +215,12 @@ void main() {
     );
     final projection = projectMeldForDisplay(
       meld: meld,
-      isVertical: true,
-      availableHeight: availableHeight -
+      compressionEnabled: true,
+      availableExtent: availableHeight -
           2 * MeldAreaWidget.topInset -
           MeldAreaWidget.borderWidth,
-      cardHeight: tableGeometry.cardHeight,
-      verticalExposedHeight: tableGeometry.verticalExposedHeight,
+      cardExtent: tableGeometry.cardHeight,
+      exposedExtent: tableGeometry.verticalExposedHeight,
     );
 
     await tester.pumpWidget(
@@ -251,5 +251,99 @@ void main() {
     expect(border.height, closeTo(projection.height, 0.001));
     expect(projection.height,
         lessThan(tableGeometry.verticalMeldHeight(meld.cards.length)));
+  });
+
+  testWidgets('compressed horizontal meld renders a horizontal span', (
+    tester,
+  ) async {
+    final meld = Meld(
+      cards: List.generate(
+        9,
+        (index) => CardModel(
+          id: index,
+          rank: 9 - index,
+          suit: SpanishSuit.bastos,
+        ),
+      ),
+    );
+    final cardKeys = List<GlobalKey>.generate(9, (_) => GlobalKey());
+    final projection = projectMeldForDisplay(
+      meld: meld,
+      compressionEnabled: true,
+      availableExtent: 200,
+      cardExtent: 80,
+      exposedExtent: 60,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MeldWidget(
+            meld: meld,
+            orientation: MeldOrientation.horizontal,
+            geometry: CardGeometry.desktop,
+            cardKeys: cardKeys,
+            projection: projection,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.getSize(find.byType(MeldWidget)), const Size(200, 120));
+    expect(find.byKey(cardKeys[0]), findsOneWidget);
+    expect(find.byKey(cardKeys[8]), findsOneWidget);
+    expect(find.byKey(cardKeys[1]), findsNothing);
+    expect(find.byKey(const ValueKey('meld-hidden-span-1-7')), findsOneWidget);
+    expect(find.text('⋯'), findsOneWidget);
+    expect(find.text('⋮'), findsNothing);
+  });
+
+  testWidgets('horizontal meld area wraps whole melds without scrolling', (
+    tester,
+  ) async {
+    final melds = List.generate(
+      3,
+      (meldIndex) => Meld(
+        cards: List.generate(
+          3,
+          (cardIndex) => CardModel(
+            id: meldIndex * 10 + cardIndex,
+            rank: 7 - cardIndex,
+            suit: SpanishSuit.bastos,
+          ),
+        ),
+      ),
+    );
+    final meldKeys = List<GlobalKey>.generate(3, (_) => GlobalKey());
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 450,
+            height: 300,
+            child: MeldAreaWidget(
+              melds: melds,
+              emptyText: 'MELDS',
+              orientation: MeldOrientation.horizontal,
+              availableWidth: 450,
+              availableHeight: 300,
+              maxCardWidth: CardGeometry.maxCardWidth,
+              meldKeys: meldKeys,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SingleChildScrollView), findsNothing);
+    final first = tester.getRect(find.byKey(meldKeys[0]));
+    final second = tester.getRect(find.byKey(meldKeys[1]));
+    final third = tester.getRect(find.byKey(meldKeys[2]));
+    expect(first.top, closeTo(second.top, 1));
+    expect(third.top, greaterThan(first.top));
+    expect(first.left, lessThan(second.left));
   });
 }

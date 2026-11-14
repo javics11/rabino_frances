@@ -35,19 +35,21 @@ class MeldWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final cardCount = meld.cards.length;
     final isVertical = orientation == MeldOrientation.vertical;
+    final displayProjection = projection ??
+        (isVertical
+            ? projectMeldForDisplay(
+              meld: meld,
+              compressionEnabled: true,
+              availableExtent: double.infinity,
+              cardExtent: geometry.cardHeight,
+              exposedExtent: geometry.verticalExposedHeight,
+            )
+            : null);
     final totalWidth = isVertical
         ? geometry.verticalMeldWidth
-        : geometry.cardWidth + (cardCount - 1) * geometry.horizontalMeldStep;
-    final displayProjection = isVertical
-        ? projection ??
-            projectMeldForDisplay(
-              meld: meld,
-              isVertical: true,
-              availableHeight: double.infinity,
-              cardHeight: geometry.cardHeight,
-              verticalExposedHeight: geometry.verticalExposedHeight,
-            )
-        : null;
+        : geometry.cardWidth +
+            ((displayProjection?.displayItemCount ?? cardCount) - 1) *
+                geometry.horizontalMeldStep;
     final totalHeight = isVertical
         ? displayProjection!.height
         : geometry.cardHeight;
@@ -63,7 +65,7 @@ class MeldWidget extends StatelessWidget {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            if (!isVertical)
+            if (!isVertical && projection == null)
               ...List.generate(cardCount, (index) {
                 return Positioned(
                   key: ValueKey(meld.cards[index].id),
@@ -82,6 +84,55 @@ class MeldWidget extends StatelessWidget {
                 );
               })
             else if (displayProjection case final MeldDisplayProjection projection) ...[
+              if (!isVertical)
+                for (final entry in projection.items.indexed)
+                  if (entry.$2 case MeldDisplayCard(:final cardIndex, :final card))
+                    Positioned(
+                      key: ValueKey(card.id),
+                      left: entry.$1 * geometry.horizontalMeldStep,
+                      top: 0,
+                      child: SizedBox(
+                        key: cardKeys != null ? cardKeys![cardIndex] : null,
+                        width: geometry.cardWidth,
+                        child: CardWidget(
+                          card: card,
+                          selected: false,
+                          geometry: geometry,
+                          cornerLayout: CardCornerLayout.vertical,
+                        ),
+                      ),
+                    )
+                  else if (entry.$2 case MeldDisplayHiddenSpan(
+                        startIndex: final startIndex,
+                        endIndex: final endIndex,
+                      ))
+                    Positioned(
+                      key: ValueKey('meld-hidden-span-$startIndex-$endIndex'),
+                      left: entry.$1 * geometry.horizontalMeldStep +
+                          geometry.cardMargin,
+                      top: 0,
+                      width: geometry.cardWidth - 2 * geometry.cardMargin,
+                      height: geometry.cardHeight,
+                      child: IgnorePointer(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            border: Border.all(color: Colors.black, width: 2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Center(
+                            child: Text(
+                              '⋯',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+              if (isVertical)
               for (final entry in projection.items.indexed)
                 if (entry.$2 case MeldDisplayCard(:final cardIndex, :final card))
                   Positioned(

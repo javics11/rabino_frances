@@ -23,10 +23,10 @@ MeldDisplayProjection project(
   double availableHeight = 120,
 }) => projectMeldForDisplay(
       meld: meld,
-      isVertical: vertical,
-      availableHeight: availableHeight,
-      cardHeight: 80,
-      verticalExposedHeight: 16,
+      compressionEnabled: vertical,
+      availableExtent: availableHeight,
+      cardExtent: 80,
+      exposedExtent: 16,
     );
 
 List<int> visibleIndexes(MeldDisplayProjection projection) => projection.items
@@ -44,6 +44,27 @@ void main() {
   test('horizontal runs never compress', () {
     expect(visibleIndexes(project(run(13), vertical: false)),
         List.generate(13, (index) => index));
+  });
+
+  test('horizontal compression uses the same stable semantic projection', () {
+    final first = projectMeldForDisplay(
+      meld: run(9),
+      compressionEnabled: true,
+      availableExtent: 200,
+      cardExtent: 80,
+      exposedExtent: 60,
+    );
+    final second = projectMeldForDisplay(
+      meld: run(9),
+      compressionEnabled: true,
+      availableExtent: 300,
+      cardExtent: 80,
+      exposedExtent: 60,
+    );
+
+    expect(visibleIndexes(first), [0, 8]);
+    expect(first.items.map(_description), second.items.map(_description));
+    expect(first.extent, 200);
   });
 
   test('groups never compress', () {

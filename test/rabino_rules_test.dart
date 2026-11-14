@@ -298,4 +298,103 @@ void main() {
     expect(result.jokerAssignments[120]!.rank, 12);
     expect(result.jokerAssignments[120]!.suit, SpanishSuit.bastos);
   });
+
+  test('full Ace-to-Ace new meld is unique with one Joker', () {
+    final result = RabinoRules.arrangeNewMeld([
+      joker(130),
+      for (int rank = 12; rank >= 1; rank--)
+        card(130 + rank, rank, SpanishSuit.bastos),
+    ]);
+
+    expect(result.status, MeldArrangementStatus.unique);
+    expect(result.cards.first.id, 130);
+    expect(result.jokerAssignments[130]!.rank, 13);
+  });
+
+  test('full Ace-to-Ace new meld is unique with two Jokers', () {
+    final result = RabinoRules.arrangeNewMeld([
+      joker(150),
+      joker(152),
+      for (int rank = 12; rank >= 1; rank--)
+        card(300 + rank, rank, SpanishSuit.bastos),
+    ]);
+
+    expect(result.status, MeldArrangementStatus.unique);
+    expect(result.jokerAssignments[150]!.rank, 1);
+    expect(result.jokerAssignments[152]!.rank, 13);
+  });
+
+  test('interchangeable new Jokers do not create false ambiguity', () {
+    final cards = [
+      joker(106),
+      joker(104),
+      card(96, 6, SpanishSuit.oros),
+      card(42, 4, SpanishSuit.oros),
+      card(93, 3, SpanishSuit.oros),
+      card(91, 1, SpanishSuit.oros),
+    ];
+    final result = RabinoRules.arrangeNewMeld(cards);
+
+    expect(result.status, MeldArrangementStatus.unique);
+    expect(result.cards.map((card) => card.rank), [6, null, 4, 3, null, 1]);
+    expect(result.cards[0].id, 96);
+    expect(result.cards[0].suit, SpanishSuit.oros);
+    expect(result.cards[1].isJoker, isTrue);
+    expect(result.cards[1].suit, isNull);
+    expect(result.cards[4].isJoker, isTrue);
+    expect(result.cards[4].suit, isNull);
+    expect(result.cards[5].id, 91);
+    expect(result.jokerAssignments[result.cards[1].id]!.rank, 5);
+    expect(result.jokerAssignments[result.cards[1].id]!.suit,
+        SpanishSuit.oros);
+    expect(result.jokerAssignments[result.cards[4].id]!.rank, 2);
+    expect(result.jokerAssignments[result.cards[4].id]!.suit,
+        SpanishSuit.oros);
+    expect(result.cards.where((card) => card.id == 106), hasLength(1));
+    expect(result.cards.where((card) => card.id == 104), hasLength(1));
+    expect(result.jokerAssignments.keys, containsAll(<int>[106, 104]));
+    expect(result.jokerAssignments, hasLength(2));
+  });
+
+  test('reversing interchangeable Joker input remains unique', () {
+    final result = RabinoRules.arrangeNewMeld([
+      joker(104),
+      joker(106),
+      card(96, 6, SpanishSuit.oros),
+      card(42, 4, SpanishSuit.oros),
+      card(93, 3, SpanishSuit.oros),
+      card(91, 1, SpanishSuit.oros),
+    ]);
+
+    expect(result.status, MeldArrangementStatus.unique);
+    expect(result.cards.map((card) => card.rank), [6, null, 4, 3, null, 1]);
+    expect(result.cards[0].id, 96);
+    expect(result.cards[0].suit, SpanishSuit.oros);
+    expect(result.cards[1].isJoker, isTrue);
+    expect(result.cards[1].suit, isNull);
+    expect(result.cards[4].isJoker, isTrue);
+    expect(result.cards[4].suit, isNull);
+    expect(result.cards[5].id, 91);
+    expect(result.jokerAssignments[result.cards[1].id]!.rank, 5);
+    expect(result.jokerAssignments[result.cards[1].id]!.suit,
+        SpanishSuit.oros);
+    expect(result.jokerAssignments[result.cards[4].id]!.rank, 2);
+    expect(result.jokerAssignments[result.cards[4].id]!.suit,
+        SpanishSuit.oros);
+    expect(result.cards.where((card) => card.id == 106), hasLength(1));
+    expect(result.cards.where((card) => card.id == 104), hasLength(1));
+    expect(result.jokerAssignments.keys, containsAll(<int>[106, 104]));
+    expect(result.jokerAssignments, hasLength(2));
+  });
+
+  test('complete natural Ace-to-Ace new meld is unique', () {
+    final result = RabinoRules.arrangeNewMeld([
+      card(170, 1, SpanishSuit.bastos),
+      for (int rank = 13; rank >= 2; rank--)
+        card(170 + rank, rank, SpanishSuit.bastos),
+      card(190, 1, SpanishSuit.bastos),
+    ]);
+
+    expect(result.status, MeldArrangementStatus.unique);
+  });
 }

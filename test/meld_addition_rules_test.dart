@@ -58,6 +58,73 @@ void main() {
     expect(alternative.jokerAssignments[34]!.rank, 8);
   });
 
+  test('supports the bounded full Ace-to-Ace run with two new Jokers', () {
+    final existing = run([
+      for (int rank = 12; rank >= 1; rank--) c(500 + rank, rank),
+    ], {});
+    final result = only(
+      RabinoRules.resolveAddCardsToMeld(existing, [j(520), j(521)]),
+    );
+
+    expect(result.cards.map((card) => card.id), [
+      520,
+      521,
+      for (int rank = 12; rank >= 1; rank--) 500 + rank,
+    ]);
+    expect(result.jokerAssignments[520]!.rank, 1);
+    expect(result.jokerAssignments[521]!.rank, 13);
+    expect(result.jokerAssignments[520]!.suit, SpanishSuit.bastos);
+    expect(result.jokerAssignments[521]!.suit, SpanishSuit.bastos);
+  });
+
+  test('supports a new Joker as K before the natural Ace-low run', () {
+    final existing = run([
+      for (int rank = 12; rank >= 1; rank--) c(580 + rank, rank),
+    ], {});
+    final result = only(RabinoRules.resolveAddCardsToMeld(existing, [j(600)]));
+
+    expect(result.cards.first.id, 600);
+    expect(result.jokerAssignments[600]!.rank, 13);
+    expect(result.jokerAssignments[600]!.suit, SpanishSuit.bastos);
+  });
+
+  test('preserves an existing Joker while adding another to the full run', () {
+    final existing = run([
+      j(610),
+      for (int rank = 12; rank >= 1; rank--) c(620 + rank, rank),
+    ], {
+      610: const JokerAssignment(
+        jokerId: 610,
+        rank: 13,
+        suit: SpanishSuit.bastos,
+      ),
+    });
+    final result = only(RabinoRules.resolveAddCardsToMeld(existing, [j(640)]));
+
+    expect(result.cards.first.id, 640);
+    expect(result.cards[1].id, 610);
+    expect(result.jokerAssignments[610]!.rank, 13);
+    expect(result.jokerAssignments[640]!.rank, 1);
+  });
+
+  test('supports the bounded full Ace-to-Ace natural run', () {
+    final cards = [
+      c(540, 1),
+      for (int rank = 13; rank >= 2; rank--) c(540 + rank, rank),
+      c(560, 1),
+    ];
+    expect(RabinoRules.validateMeld(Meld(cards: cards)).isValid, isTrue);
+  });
+
+  test('K-A-2 remains invalid and does not wrap', () {
+    expect(
+      RabinoRules.validateMeld(
+        Meld(cards: [c(570, 13), c(571, 1), c(572, 2)]),
+      ).isValid,
+      isFalse,
+    );
+  });
+
   test('multiple new Jokers stay together', () {
     final result = RabinoRules.resolveAddCardsToMeld(
       run([c(40, 6), c(41, 5), c(42, 4)], {}),
