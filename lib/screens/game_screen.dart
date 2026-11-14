@@ -35,7 +35,9 @@ class _GameScreenState extends State<GameScreen> {
   final List<GlobalKey> playerMeldKeys = [];
   final List<List<GlobalKey>> playerMeldCardKeys = [];
   int? hoveredMeldIndex;
+  bool? hoveredMeldBefore;
   int? newMeldInsertionIndex;
+  List<int>? _activeDragHandIndexes;
   final MeldOrientation meldOrientation = MeldOrientation.vertical;
   int _aiGeneration = 0;
 
@@ -92,6 +94,7 @@ class _GameScreenState extends State<GameScreen> {
     setState(() {
       selectedCardIndexes.clear();
       hoveredMeldIndex = null;
+      hoveredMeldBefore = null;
       newMeldInsertionIndex = null;
     });
   }
@@ -106,31 +109,55 @@ class _GameScreenState extends State<GameScreen> {
     );
 
     int? newHoveredMeldIndex;
+    bool? newHoveredMeldBefore;
     int? newMeldIndex;
 
     if (dropResult.type == DropTargetType.existingMeld) {
       newHoveredMeldIndex = dropResult.meldIndex;
+      final meldRect = DragDropService.getGlobalRect(
+        playerMeldKeys[dropResult.meldIndex!],
+      );
+      final handIndexes = _activeDragHandIndexes ?? selectedCardIndexes.toList();
+      final additionResult = handIndexes.isEmpty
+          ? null
+          : gameService.resolveAddCardsToMeld(
+              dropResult.meldIndex!,
+              handIndexes,
+            );
+      if (meldRect != null &&
+          additionResult != null &&
+          additionResult.isValid &&
+          !additionResult.isUnique) {
+        newHoveredMeldBefore = meldOrientation.isBefore(position, meldRect);
+      }
+
 
     } else if (dropResult.type == DropTargetType.meldArea) {
       newMeldIndex = _newMeldIndexForPosition(position);
     }
 
     if (hoveredMeldIndex != newHoveredMeldIndex ||
+        hoveredMeldBefore != newHoveredMeldBefore ||
         newMeldInsertionIndex != newMeldIndex) {
       setState(() {
         hoveredMeldIndex = newHoveredMeldIndex;
+        hoveredMeldBefore = newHoveredMeldBefore;
         newMeldInsertionIndex = newMeldIndex;
       });
     }
   }
 
   void _clearHoveredMeld() {
-    if (hoveredMeldIndex != null || newMeldInsertionIndex != null) {
+    if (hoveredMeldIndex != null ||
+        hoveredMeldBefore != null ||
+        newMeldInsertionIndex != null) {
       setState(() {
         hoveredMeldIndex = null;
+        hoveredMeldBefore = null;
         newMeldInsertionIndex = null;
       });
     }
+    _activeDragHandIndexes = null;
   }
 
   void _showMeldRejection({MeldArrangementStatus? status}) {
@@ -418,6 +445,7 @@ class _GameScreenState extends State<GameScreen> {
                     meldCardKeys: playerMeldCardKeys,
                     melds: player.melds,
                     hoveredMeldIndex: hoveredMeldIndex,
+                    hoveredMeldBefore: hoveredMeldBefore,
                     newMeldInsertionIndex: newMeldInsertionIndex,
                     emptyText: "MELDS",
                     orientation: meldOrientation,
@@ -556,6 +584,9 @@ class _GameScreenState extends State<GameScreen> {
                                 onCardDragUpdated: (position) {
                 _updateHoveredMeld(position);
                                 },
+                                onCardDragStarted: (indexes) {
+                _activeDragHandIndexes = indexes;
+                                },
                                 onCardDragEnded: _clearHoveredMeld,
 
                                 onCardDropped: (draggedCards, position) {
@@ -610,7 +641,7 @@ class _GameScreenState extends State<GameScreen> {
                   MeldAdditionAlternative? alternative;
                   if (result.isUnique) {
                     alternative = result.alternatives.single;
-                  } else if (result.alternatives.length == 2) {
+                  } else if (!result.isUnique) {
                     final meldRect = DragDropService.getGlobalRect(
                       playerMeldKeys[meldIndex],
                     );

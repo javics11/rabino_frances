@@ -11,6 +11,7 @@ class PlayerHandWidget extends StatefulWidget {
   final Set<int> selectedIndexes;
   final Function(int)? onCardTapped;
   final ValueChanged<Set<int>>? onSelectionChanged;
+  final ValueChanged<List<int>>? onCardDragStarted;
   /// Receives the raw global pointer position for external hit testing.
   final Function(List<CardModel>, Offset)? onCardDropped;
   /// Receives the raw global pointer position for external hover hit testing.
@@ -27,6 +28,7 @@ class PlayerHandWidget extends StatefulWidget {
     required this.selectedIndexes,
     this.onCardTapped,
     this.onSelectionChanged,
+    this.onCardDragStarted,
     this.onCardDropped,
     this.onCardDragUpdated,
     this.onCardDragEnded,
@@ -264,6 +266,9 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
                                 step /
                                 2;
                           });
+                          widget.onCardDragStarted?.call(
+                            List<int>.unmodifiable(draggingIndexes),
+                          );
                           _showDragOverlay();
                         }
                       : null,

@@ -4,10 +4,95 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rabino_frances/models/card.dart';
 import 'package:rabino_frances/models/meld.dart';
 import 'package:rabino_frances/models/spanish_suit.dart';
+import 'package:rabino_frances/models/deck.dart';
+import 'package:rabino_frances/models/game.dart';
+import 'package:rabino_frances/models/player.dart';
+import 'package:rabino_frances/screens/game_screen.dart';
 import 'package:rabino_frances/widgets/meld_area_widget.dart';
 import 'package:rabino_frances/widgets/meld_orientation.dart';
 
 void main() {
+  testWidgets('GameScreen wires vertical orientation to both meld areas', (
+    tester,
+  ) async {
+    final game = Game(
+      deck: Deck(),
+      players: [Player('Player'), Player('AI')],
+    );
+
+    await tester.pumpWidget(MaterialApp(home: GameScreen(game: game)));
+    await tester.pumpAndSettle();
+
+    final meldAreas = tester.widgetList<MeldAreaWidget>(
+      find.byType(MeldAreaWidget),
+    );
+    expect(meldAreas, hasLength(2));
+    expect(
+      meldAreas.every((area) => area.orientation == MeldOrientation.vertical),
+      isTrue,
+    );
+  });
+
+  testWidgets('directional smart-add highlight follows orientation', (
+    tester,
+  ) async {
+    final meld = Meld(cards: [
+      CardModel(id: 100, rank: 5, suit: SpanishSuit.bastos),
+      CardModel(id: 101, rank: 6, suit: SpanishSuit.bastos),
+      CardModel(id: 102, rank: 7, suit: SpanishSuit.bastos),
+    ]);
+    final meldKey = GlobalKey();
+
+    Future<void> pumpHighlight(
+      MeldOrientation orientation,
+      bool before,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: MeldAreaWidget(
+              melds: [meld],
+              emptyText: 'MELDS',
+              orientation: orientation,
+              meldKeys: [meldKey],
+              hoveredMeldIndex: 0,
+              hoveredMeldBefore: before,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    await pumpHighlight(MeldOrientation.horizontal, true);
+    var meldRect = tester.getRect(find.byKey(meldKey));
+    var highlightRect = tester.getRect(find.byKey(const ValueKey('meld-directional-highlight-0')));
+    expect(highlightRect.width, 8);
+    expect(highlightRect.left, closeTo(meldRect.left, 1));
+    expect(highlightRect.height, greaterThan(3));
+
+    await pumpHighlight(MeldOrientation.horizontal, false);
+    meldRect = tester.getRect(find.byKey(meldKey));
+    highlightRect = tester.getRect(find.byKey(const ValueKey('meld-directional-highlight-0')));
+    expect(highlightRect.width, 8);
+    expect(highlightRect.right, closeTo(meldRect.right, 1));
+    expect(highlightRect.height, greaterThan(3));
+
+    await pumpHighlight(MeldOrientation.vertical, true);
+    meldRect = tester.getRect(find.byKey(meldKey));
+    highlightRect = tester.getRect(find.byKey(const ValueKey('meld-directional-highlight-0')));
+    expect(highlightRect.height, 8);
+    expect(highlightRect.top, closeTo(meldRect.top, 1));
+    expect(highlightRect.width, greaterThan(3));
+
+    await pumpHighlight(MeldOrientation.vertical, false);
+    meldRect = tester.getRect(find.byKey(meldKey));
+    highlightRect = tester.getRect(find.byKey(const ValueKey('meld-directional-highlight-0')));
+    expect(highlightRect.height, 8);
+    expect(highlightRect.bottom, closeTo(meldRect.bottom, 1));
+    expect(highlightRect.width, greaterThan(3));
+  });
+
   testWidgets('responsive-fit vertical meld stays inside the rendered area', (
     tester,
   ) async {

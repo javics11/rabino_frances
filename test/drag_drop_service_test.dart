@@ -88,4 +88,109 @@ void main() {
       DropTargetType.existingMeld,
     );
   });
+
+  testWidgets('supports a long left meld and short right meld', (tester) async {
+    final areaKey = GlobalKey();
+    final leftKey = GlobalKey();
+    final rightKey = GlobalKey();
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SizedBox(
+          key: areaKey,
+          height: 400,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(key: leftKey, width: 100, height: 350),
+              const SizedBox(width: 24),
+              SizedBox(key: rightKey, width: 100, height: 150),
+            ],
+          ),
+        ),
+      ),
+    ));
+
+    final left = DragDropService.getGlobalRect(leftKey)!;
+    final right = DragDropService.getGlobalRect(rightKey)!;
+    final result = DragDropService.findDropTarget(
+      position: Offset((left.right + right.left) / 2, left.top + 300),
+      discardPileKey: GlobalKey(),
+      meldAreaKey: areaKey,
+      meldKeys: [leftKey, rightKey],
+      meldCardKeys: [[], []],
+    );
+
+    expect(result.type, DropTargetType.meldArea);
+  });
+
+  testWidgets('supports a short left meld and long right meld', (tester) async {
+    final areaKey = GlobalKey();
+    final leftKey = GlobalKey();
+    final rightKey = GlobalKey();
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SizedBox(
+          key: areaKey,
+          height: 400,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(key: leftKey, width: 100, height: 150),
+              const SizedBox(width: 24),
+              SizedBox(key: rightKey, width: 100, height: 350),
+            ],
+          ),
+        ),
+      ),
+    ));
+
+    final left = DragDropService.getGlobalRect(leftKey)!;
+    final right = DragDropService.getGlobalRect(rightKey)!;
+    final result = DragDropService.findDropTarget(
+      position: Offset((left.right + right.left) / 2, left.top + 300),
+      discardPileKey: GlobalKey(),
+      meldAreaKey: areaKey,
+      meldKeys: [leftKey, rightKey],
+      meldCardKeys: [[], []],
+    );
+
+    expect(result.type, DropTargetType.meldArea);
+  });
+
+  testWidgets('rejects an inter-meld X gap outside the meld area', (tester) async {
+    final areaKey = GlobalKey();
+    final leftKey = GlobalKey();
+    final rightKey = GlobalKey();
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SizedBox(
+          key: areaKey,
+          height: 400,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(key: leftKey, width: 100, height: 150),
+              const SizedBox(width: 24),
+              SizedBox(key: rightKey, width: 100, height: 150),
+            ],
+          ),
+        ),
+      ),
+    ));
+
+    final left = DragDropService.getGlobalRect(leftKey)!;
+    final right = DragDropService.getGlobalRect(rightKey)!;
+    final result = DragDropService.findDropTarget(
+      position: Offset((left.right + right.left) / 2, 450),
+      discardPileKey: GlobalKey(),
+      meldAreaKey: areaKey,
+      meldKeys: [leftKey, rightKey],
+      meldCardKeys: [[], []],
+    );
+
+    expect(result.type, DropTargetType.none);
+  });
 }

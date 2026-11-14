@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 enum DropTargetType { none, discardPile, existingMeld, meldArea }
@@ -97,24 +95,18 @@ class DragDropService {
     for (int meldIndex = 0; meldIndex + 1 < meldKeys.length; meldIndex++) {
       final leftRect = getGlobalRect(meldKeys[meldIndex]);
       final rightRect = getGlobalRect(meldKeys[meldIndex + 1]);
+      final meldAreaRect = getGlobalRect(meldAreaKey);
 
       if (leftRect == null ||
           rightRect == null ||
+          meldAreaRect == null ||
           position.dx <= leftRect.right ||
           position.dx >= rightRect.left) {
         continue;
       }
 
-      final verticalGap = leftRect.center.dy;
-      final top = math.max(leftRect.top, rightRect.top);
-      final bottom = math.min(leftRect.bottom, rightRect.bottom);
-
-      if (verticalGap >= top && verticalGap <= bottom &&
-          position.dy >= top && position.dy <= bottom) {
-        final meldAreaRect = getGlobalRect(meldAreaKey);
-        if (meldAreaRect != null && meldAreaRect.contains(position)) {
-          return const DropResult(type: DropTargetType.meldArea);
-        }
+      if (meldAreaRect.contains(position)) {
+        return const DropResult(type: DropTargetType.meldArea);
       }
     }
 

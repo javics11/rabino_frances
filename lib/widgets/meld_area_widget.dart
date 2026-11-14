@@ -17,6 +17,7 @@ class MeldAreaWidget extends StatelessWidget {
   final List<GlobalKey>? meldKeys;
   final List<List<GlobalKey>>? meldCardKeys;
   final int? hoveredMeldIndex;
+  final bool? hoveredMeldBefore;
   final int? newMeldInsertionIndex;
   final void Function(int, Offset)? onMeldTapped;
   final ValueChanged<Offset>? onAreaTapped;
@@ -35,6 +36,7 @@ class MeldAreaWidget extends StatelessWidget {
     this.meldKeys,
     this.meldCardKeys,
     this.hoveredMeldIndex,
+    this.hoveredMeldBefore,
     this.newMeldInsertionIndex,
     this.onMeldTapped,
     this.onAreaTapped,
@@ -68,6 +70,8 @@ class MeldAreaWidget extends StatelessWidget {
             maxCardWidth: maxCardWidth,
           )
         : geometry;
+    final verticalCardFaceWidth =
+        tableGeometry.cardWidth - 2 * tableGeometry.cardMargin;
     final contentHeight = orientation == MeldOrientation.vertical && melds.isNotEmpty
         ? melds
               .map((meld) => tableGeometry.verticalMeldHeight(meld.cards.length))
@@ -126,12 +130,42 @@ class MeldAreaWidget extends StatelessWidget {
                               padding: const EdgeInsets.symmetric(horizontal: 12),
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 150),
-                                color: hoveredMeldIndex == index
-                                    ? Colors.lightGreenAccent.withValues(alpha: 0.45)
-                                    : Colors.transparent,
+                                color: Colors.transparent,
                                 child: Stack(
                                   clipBehavior: Clip.none,
                                   children: [
+                                    Positioned(
+                                      key: ValueKey(
+                                        'meld-hover-highlight-$index',
+                                      ),
+                                      left: orientation == MeldOrientation.vertical
+                                          ? tableGeometry.cardMargin
+                                          : 0,
+                                      top: 0,
+                                      width: orientation == MeldOrientation.vertical
+                                          ? verticalCardFaceWidth
+                                          : null,
+                                      height: orientation == MeldOrientation.vertical
+                                          ? tableGeometry.verticalMeldHeight(
+                                              melds[index].cards.length,
+                                            )
+                                          : null,
+                                      right: orientation == MeldOrientation.horizontal
+                                          ? 0
+                                          : null,
+                                      bottom: orientation == MeldOrientation.horizontal
+                                          ? 0
+                                          : null,
+                                      child: IgnorePointer(
+                                        child: ColoredBox(
+                                          color: hoveredMeldIndex == index
+                                              ? Colors.lightGreenAccent.withValues(
+                                                  alpha: 0.45,
+                                                )
+                                              : Colors.transparent,
+                                        ),
+                                      ),
+                                    ),
                                     MeldWidget(
                                       meldKey: meldKeys != null
                                           ? meldKeys![index]
@@ -147,7 +181,28 @@ class MeldAreaWidget extends StatelessWidget {
                                           : (position) =>
                                               onMeldTapped!(index, position),
                                     ),
-                                    Positioned.fill(
+                                    Positioned(
+                                      key: ValueKey(
+                                        'meld-hover-border-$index',
+                                      ),
+                                      left: orientation == MeldOrientation.vertical
+                                          ? tableGeometry.cardMargin
+                                          : 0,
+                                      top: 0,
+                                      width: orientation == MeldOrientation.vertical
+                                          ? verticalCardFaceWidth
+                                          : null,
+                                      height: orientation == MeldOrientation.vertical
+                                          ? tableGeometry.cardHeight +
+                                              (melds[index].cards.length - 1) *
+                                                  tableGeometry.verticalExposedHeight
+                                          : null,
+                                      right: orientation == MeldOrientation.horizontal
+                                          ? 0
+                                          : null,
+                                      bottom: orientation == MeldOrientation.horizontal
+                                          ? 0
+                                          : null,
                                       child: IgnorePointer(
                                         child: DecoratedBox(
                                           decoration: BoxDecoration(
@@ -163,6 +218,46 @@ class MeldAreaWidget extends StatelessWidget {
                                         ),
                                       ),
                                     ),
+                                    if (hoveredMeldIndex == index &&
+                                        hoveredMeldBefore != null)
+                                      Positioned(
+                                        key: ValueKey(
+                                          'meld-directional-highlight-$index',
+                                        ),
+                                        left: orientation == MeldOrientation.vertical
+                                            ? tableGeometry.cardMargin
+                                            : orientation == MeldOrientation.horizontal &&
+                                                    hoveredMeldBefore == true
+                                                ? 0
+                                                : null,
+                                        right: orientation == MeldOrientation.vertical
+                                            ? null
+                                            : orientation == MeldOrientation.horizontal &&
+                                                    hoveredMeldBefore == false
+                                                ? 0
+                                                : null,
+                                        top: orientation == MeldOrientation.horizontal ||
+                                                (orientation == MeldOrientation.vertical &&
+                                                    hoveredMeldBefore == true)
+                                            ? 0
+                                            : null,
+                                        bottom: orientation == MeldOrientation.horizontal ||
+                                                (orientation == MeldOrientation.vertical &&
+                                                    hoveredMeldBefore == false)
+                                            ? 0
+                                            : null,
+                                        width: orientation == MeldOrientation.vertical
+                                            ? verticalCardFaceWidth
+                                            : 8,
+                                        height: orientation == MeldOrientation.vertical
+                                            ? 8
+                                            : null,
+                                        child: IgnorePointer(
+                                          child: ColoredBox(
+                                            color: Colors.green.shade900,
+                                          ),
+                                        ),
+                                      ),
                                   ],
                                 ),
                               ),
