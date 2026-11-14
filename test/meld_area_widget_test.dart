@@ -9,7 +9,10 @@ import 'package:rabino_frances/models/game.dart';
 import 'package:rabino_frances/models/player.dart';
 import 'package:rabino_frances/screens/game_screen.dart';
 import 'package:rabino_frances/widgets/meld_area_widget.dart';
+import 'package:rabino_frances/widgets/meld_widget.dart';
 import 'package:rabino_frances/widgets/meld_orientation.dart';
+import 'package:rabino_frances/widgets/meld_display_projection.dart';
+import 'package:rabino_frances/widgets/card_geometry.dart';
 
 void main() {
   testWidgets('GameScreen wires vertical orientation to both meld areas', (
@@ -138,5 +141,52 @@ void main() {
     expect(area.bottom - last.bottom, greaterThanOrEqualTo(2.0));
     expect(first.width, greaterThan(56));
     expect(last.bottom, lessThanOrEqualTo(area.bottom));
+  });
+
+  testWidgets('compressed vertical meld renders projected cards and span', (
+    tester,
+  ) async {
+    final meld = Meld(
+      cards: List.generate(
+        9,
+        (index) => CardModel(
+          id: index,
+          rank: 9 - index,
+          suit: SpanishSuit.bastos,
+        ),
+      ),
+    );
+    final cardKeys = List<GlobalKey>.generate(9, (_) => GlobalKey());
+    final projection = projectMeldForDisplay(
+      meld: meld,
+      isVertical: true,
+      availableHeight: 120,
+      cardHeight: 80,
+      verticalExposedHeight: 16,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MeldWidget(
+            meld: meld,
+            orientation: MeldOrientation.vertical,
+            geometry: CardGeometry.desktop,
+            cardKeys: cardKeys,
+            projection: projection,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(cardKeys[0]), findsOneWidget);
+    expect(find.byKey(cardKeys[8]), findsOneWidget);
+    expect(find.byKey(cardKeys[1]), findsNothing);
+    expect(
+      find.byKey(const ValueKey('meld-hidden-span-1-7')),
+      findsOneWidget,
+    );
+    expect(find.text('⋮'), findsOneWidget);
   });
 }

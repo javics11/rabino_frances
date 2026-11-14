@@ -4,6 +4,7 @@ import '../models/meld.dart';
 import 'meld_widget.dart';
 import 'meld_orientation.dart';
 import 'card_geometry.dart';
+import 'meld_display_projection.dart';
 
 class MeldAreaWidget extends StatelessWidget {
   static const double topInset = 2.5;
@@ -173,6 +174,19 @@ class MeldAreaWidget extends StatelessWidget {
                                       meld: melds[index],
                                       orientation: orientation,
                                       geometry: tableGeometry,
+                                      projection: orientation ==
+                                              MeldOrientation.vertical
+                                          ? projectMeldForDisplay(
+                                              meld: melds[index],
+                                              isVertical: true,
+                                              availableHeight:
+                                                  contentAvailableHeight,
+                                              cardHeight:
+                                                  tableGeometry.cardHeight,
+                                              verticalExposedHeight: tableGeometry
+                                                  .verticalExposedHeight,
+                                            )
+                                          : null,
                                       cardKeys: meldCardKeys != null
                                           ? meldCardKeys![index]
                                           : null,
