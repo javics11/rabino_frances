@@ -189,4 +189,67 @@ void main() {
     );
     expect(find.text('⋮'), findsOneWidget);
   });
+
+  testWidgets('compressed vertical hover visuals use projected height', (
+    tester,
+  ) async {
+    final meld = Meld(
+      cards: List.generate(
+        9,
+        (index) => CardModel(
+          id: index,
+          rank: 9 - index,
+          suit: SpanishSuit.bastos,
+        ),
+      ),
+    );
+    final meldKey = GlobalKey();
+    const availableHeight = 120.0;
+    final tableGeometry = CardGeometry.forMeldArea(
+      availableWidth: 390,
+      availableHeight: availableHeight -
+          2 * MeldAreaWidget.topInset -
+          MeldAreaWidget.borderWidth,
+      longestMeld: 9,
+      maxCardWidth: CardGeometry.maxCardWidth,
+    );
+    final projection = projectMeldForDisplay(
+      meld: meld,
+      isVertical: true,
+      availableHeight: availableHeight -
+          2 * MeldAreaWidget.topInset -
+          MeldAreaWidget.borderWidth,
+      cardHeight: tableGeometry.cardHeight,
+      verticalExposedHeight: tableGeometry.verticalExposedHeight,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MeldAreaWidget(
+            melds: [meld],
+            emptyText: 'MELDS',
+            orientation: MeldOrientation.vertical,
+            meldKeys: [meldKey],
+            hoveredMeldIndex: 0,
+            availableWidth: 390,
+            availableHeight: availableHeight,
+            maxCardWidth: CardGeometry.maxCardWidth,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final highlight = tester.getRect(
+      find.byKey(const ValueKey('meld-hover-highlight-0')),
+    );
+    final border = tester.getRect(
+      find.byKey(const ValueKey('meld-hover-border-0')),
+    );
+    expect(highlight.height, closeTo(projection.height, 0.001));
+    expect(border.height, closeTo(projection.height, 0.001));
+    expect(projection.height,
+        lessThan(tableGeometry.verticalMeldHeight(meld.cards.length)));
+  });
 }

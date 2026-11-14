@@ -127,7 +127,20 @@ class MeldAreaWidget extends StatelessWidget {
                           if (newMeldInsertionIndex == index)
                             const _MeldInsertionIndicator(),
                           if (index < melds.length)
-                            Padding(
+                            Builder(
+                              builder: (context) {
+                                final projection = orientation ==
+                                        MeldOrientation.vertical
+                                    ? projectMeldForDisplay(
+                                        meld: melds[index],
+                                        isVertical: true,
+                                        availableHeight: contentAvailableHeight,
+                                        cardHeight: tableGeometry.cardHeight,
+                                        verticalExposedHeight:
+                                            tableGeometry.verticalExposedHeight,
+                                      )
+                                    : null;
+                                return Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 12),
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 150),
@@ -147,9 +160,7 @@ class MeldAreaWidget extends StatelessWidget {
                                           ? verticalCardFaceWidth
                                           : null,
                                       height: orientation == MeldOrientation.vertical
-                                          ? tableGeometry.verticalMeldHeight(
-                                              melds[index].cards.length,
-                                            )
+                                          ? projection?.height
                                           : null,
                                       right: orientation == MeldOrientation.horizontal
                                           ? 0
@@ -174,19 +185,7 @@ class MeldAreaWidget extends StatelessWidget {
                                       meld: melds[index],
                                       orientation: orientation,
                                       geometry: tableGeometry,
-                                      projection: orientation ==
-                                              MeldOrientation.vertical
-                                          ? projectMeldForDisplay(
-                                              meld: melds[index],
-                                              isVertical: true,
-                                              availableHeight:
-                                                  contentAvailableHeight,
-                                              cardHeight:
-                                                  tableGeometry.cardHeight,
-                                              verticalExposedHeight: tableGeometry
-                                                  .verticalExposedHeight,
-                                            )
-                                          : null,
+                                      projection: projection,
                                       cardKeys: meldCardKeys != null
                                           ? meldCardKeys![index]
                                           : null,
@@ -207,9 +206,7 @@ class MeldAreaWidget extends StatelessWidget {
                                           ? verticalCardFaceWidth
                                           : null,
                                       height: orientation == MeldOrientation.vertical
-                                          ? tableGeometry.cardHeight +
-                                              (melds[index].cards.length - 1) *
-                                                  tableGeometry.verticalExposedHeight
+                                          ? projection?.height
                                           : null,
                                       right: orientation == MeldOrientation.horizontal
                                           ? 0
@@ -275,6 +272,8 @@ class MeldAreaWidget extends StatelessWidget {
                                   ],
                                 ),
                               ),
+                                );
+                              },
                             ),
                         ],
                       ],
