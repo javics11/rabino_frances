@@ -22,6 +22,16 @@ class DropResult {
       insertionIndex = null;
 }
 
+class HorizontalMeldInsertionTarget {
+  final int insertionIndex;
+  final int rowIndex;
+
+  const HorizontalMeldInsertionTarget({
+    required this.insertionIndex,
+    required this.rowIndex,
+  });
+}
+
 class DragDropService {
   static Rect? getGlobalRect(GlobalKey key) {
     final context = key.currentContext;
@@ -47,6 +57,65 @@ class DragDropService {
       rect.top - padding,
       rect.right + padding,
       rect.bottom + padding,
+    );
+  }
+
+  static HorizontalMeldInsertionTarget? findHorizontalMeldInsertionTarget({
+    required Offset position,
+    required Rect areaRect,
+    required List<Rect> meldRects,
+  }) {
+    if (!areaRect.contains(position) || meldRects.isEmpty) return null;
+
+    final rows = <List<int>>[];
+    for (int index = 0; index < meldRects.length; index++) {
+      final rect = meldRects[index];
+      final row = rows.indexWhere(
+        (rowIndexes) =>
+            (rect.center.dy - meldRects[rowIndexes.first].center.dy).abs() < 1,
+      );
+      if (row == -1) {
+        rows.add([index]);
+      } else {
+        rows[row].add(index);
+      }
+    }
+    for (final row in rows) {
+      row.sort((a, b) => meldRects[a].left.compareTo(meldRects[b].left));
+    }
+    rows.sort((a, b) => meldRects[a.first].top.compareTo(meldRects[b.first].top));
+
+    var rowIndex = 0;
+    var nearestDistance = double.infinity;
+    for (int index = 0; index < rows.length; index++) {
+      final rects = rows[index].map((meldIndex) => meldRects[meldIndex]);
+      final top = rects.map((rect) => rect.top).reduce((a, b) => a < b ? a : b);
+      final bottom =
+          rects.map((rect) => rect.bottom).reduce((a, b) => a > b ? a : b);
+      final distance = position.dy < top
+          ? top - position.dy
+          : position.dy > bottom
+              ? position.dy - bottom
+              : 0.0;
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        rowIndex = index;
+      }
+    }
+
+    final row = rows[rowIndex];
+    for (int localIndex = 0; localIndex < row.length; localIndex++) {
+      final meldIndex = row[localIndex];
+      if (position.dx < meldRects[meldIndex].center.dx) {
+        return HorizontalMeldInsertionTarget(
+          insertionIndex: meldIndex,
+          rowIndex: rowIndex,
+        );
+      }
+    }
+    return HorizontalMeldInsertionTarget(
+      insertionIndex: row.last + 1,
+      rowIndex: rowIndex,
     );
   }
 
@@ -106,6 +175,10 @@ class DragDropService {
       }
 
       if (meldAreaRect.contains(position)) {
+        if (leftRect.bottom <= rightRect.top ||
+            rightRect.bottom <= leftRect.top) {
+          continue;
+        }
         return const DropResult(type: DropTargetType.meldArea);
       }
     }

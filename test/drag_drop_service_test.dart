@@ -3,6 +3,74 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rabino_frances/services/drag_drop_service.dart';
 
 void main() {
+  test('maps horizontal row-local positions to logical insertion indexes', () {
+    const rects = [
+      Rect.fromLTWH(0, 0, 100, 80),
+      Rect.fromLTWH(124, 0, 100, 80),
+      Rect.fromLTWH(248, 0, 100, 80),
+      Rect.fromLTWH(40, 92, 100, 80),
+      Rect.fromLTWH(164, 92, 100, 80),
+    ];
+    const area = Rect.fromLTWH(0, 0, 400, 200);
+
+    expect(
+      DragDropService.findHorizontalMeldInsertionTarget(
+        position: const Offset(10, 40),
+        areaRect: area,
+        meldRects: rects,
+      )!.insertionIndex,
+      0,
+    );
+    expect(
+      DragDropService.findHorizontalMeldInsertionTarget(
+        position: const Offset(112, 40),
+        areaRect: area,
+        meldRects: rects,
+      )!.insertionIndex,
+      1,
+    );
+    expect(
+      DragDropService.findHorizontalMeldInsertionTarget(
+        position: const Offset(10, 132),
+        areaRect: area,
+        meldRects: rects,
+      )!.insertionIndex,
+      3,
+    );
+    expect(
+      DragDropService.findHorizontalMeldInsertionTarget(
+        position: const Offset(152, 132),
+        areaRect: area,
+        meldRects: rects,
+      )!.insertionIndex,
+      4,
+    );
+    expect(
+      DragDropService.findHorizontalMeldInsertionTarget(
+        position: const Offset(300, 132),
+        areaRect: area,
+        meldRects: rects,
+      )!.insertionIndex,
+      5,
+    );
+  });
+
+  test('does not treat row transition as a physical inter-meld gap', () {
+    const rects = [
+      Rect.fromLTWH(0, 0, 100, 80),
+      Rect.fromLTWH(124, 0, 100, 80),
+      Rect.fromLTWH(40, 92, 100, 80),
+    ];
+    const area = Rect.fromLTWH(0, 0, 300, 200);
+    final target = DragDropService.findHorizontalMeldInsertionTarget(
+      position: const Offset(112, 40),
+      areaRect: area,
+      meldRects: rects,
+    );
+    expect(target!.insertionIndex, 1);
+    expect(rects[1].bottom, lessThanOrEqualTo(rects[2].top));
+  });
+
   testWidgets('recognizes the physical gap between melds', (tester) async {
     final areaKey = GlobalKey();
     final leftKey = GlobalKey();

@@ -42,6 +42,7 @@ class _GameScreenState extends State<GameScreen> {
   int? hoveredMeldIndex;
   bool? hoveredMeldBefore;
   int? newMeldInsertionIndex;
+  int? newMeldInsertionRow;
   List<int>? _activeDragHandIndexes;
   late MeldOrientation meldOrientation;
   int _aiGeneration = 0;
@@ -65,6 +66,8 @@ class _GameScreenState extends State<GameScreen> {
       hoveredMeldIndex = null;
       hoveredMeldBefore = null;
       newMeldInsertionIndex = null;
+      newMeldInsertionRow = null;
+      newMeldInsertionRow = null;
       _activeDragHandIndexes = null;
     });
   }
@@ -135,6 +138,7 @@ class _GameScreenState extends State<GameScreen> {
     int? newHoveredMeldIndex;
     bool? newHoveredMeldBefore;
     int? newMeldIndex;
+    int? newMeldRow;
 
     if (dropResult.type == DropTargetType.existingMeld) {
       newHoveredMeldIndex = dropResult.meldIndex;
@@ -157,16 +161,20 @@ class _GameScreenState extends State<GameScreen> {
 
 
     } else if (dropResult.type == DropTargetType.meldArea) {
-      newMeldIndex = _newMeldIndexForPosition(position);
+      final target = _horizontalMeldInsertionTarget(position);
+      newMeldIndex = target?.insertionIndex ?? _newMeldIndexForPosition(position);
+      newMeldRow = target?.rowIndex;
     }
 
     if (hoveredMeldIndex != newHoveredMeldIndex ||
         hoveredMeldBefore != newHoveredMeldBefore ||
-        newMeldInsertionIndex != newMeldIndex) {
+        newMeldInsertionIndex != newMeldIndex ||
+        newMeldInsertionRow != newMeldRow) {
       setState(() {
         hoveredMeldIndex = newHoveredMeldIndex;
         hoveredMeldBefore = newHoveredMeldBefore;
         newMeldInsertionIndex = newMeldIndex;
+        newMeldInsertionRow = newMeldRow;
       });
     }
   }
@@ -179,6 +187,7 @@ class _GameScreenState extends State<GameScreen> {
         hoveredMeldIndex = null;
         hoveredMeldBefore = null;
         newMeldInsertionIndex = null;
+        newMeldInsertionRow = null;
       });
     }
     _activeDragHandIndexes = null;
@@ -484,6 +493,7 @@ class _GameScreenState extends State<GameScreen> {
                     hoveredMeldIndex: hoveredMeldIndex,
                     hoveredMeldBefore: hoveredMeldBefore,
                     newMeldInsertionIndex: newMeldInsertionIndex,
+                    newMeldInsertionRow: newMeldInsertionRow,
                     emptyText: "MELDS",
                     orientation: meldOrientation,
                     geometry: geometry,
@@ -546,6 +556,7 @@ class _GameScreenState extends State<GameScreen> {
                       }
 
                       final insertionIndex =
+                          _horizontalMeldInsertionTarget(position)?.insertionIndex ??
                           _newMeldIndexForPosition(position);
                       var success = false;
                       MeldArrangementStatus? failureStatus;
@@ -712,7 +723,9 @@ class _GameScreenState extends State<GameScreen> {
                 if (dropResult.type == DropTargetType.meldArea) {
                   // The preview is only visual state. Use the final callback
                   // position as the source of truth for the committed index.
-                  final insertionIndex = _newMeldIndexForPosition(position);
+                  final insertionIndex =
+                      _horizontalMeldInsertionTarget(position)?.insertionIndex ??
+                      _newMeldIndexForPosition(position);
                   var success = false;
                   MeldArrangementStatus? failureStatus;
                   setState(() {
@@ -808,6 +821,27 @@ class _GameScreenState extends State<GameScreen> {
       }
     }
     return playerMeldKeys.length;
+  }
+
+  HorizontalMeldInsertionTarget? _horizontalMeldInsertionTarget(
+    Offset position,
+  ) {
+    if (meldOrientation != MeldOrientation.horizontal ||
+        playerMeldKeys.isEmpty) {
+      return null;
+    }
+    final areaRect = DragDropService.getGlobalRect(playerMeldAreaKey);
+    if (areaRect == null) return null;
+    final meldRects = [
+      for (final key in playerMeldKeys)
+        DragDropService.getGlobalRect(key),
+    ];
+    if (meldRects.any((rect) => rect == null)) return null;
+    return DragDropService.findHorizontalMeldInsertionTarget(
+      position: position,
+      areaRect: areaRect,
+      meldRects: meldRects.cast<Rect>(),
+    );
   }
 
   Widget _buildDrawPile(CardGeometry geometry) {

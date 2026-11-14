@@ -21,6 +21,7 @@ class MeldAreaWidget extends StatelessWidget {
   final int? hoveredMeldIndex;
   final bool? hoveredMeldBefore;
   final int? newMeldInsertionIndex;
+  final int? newMeldInsertionRow;
   final void Function(int, Offset)? onMeldTapped;
   final ValueChanged<Offset>? onAreaTapped;
   final MeldOrientation orientation;
@@ -40,6 +41,7 @@ class MeldAreaWidget extends StatelessWidget {
     this.hoveredMeldIndex,
     this.hoveredMeldBefore,
     this.newMeldInsertionIndex,
+    this.newMeldInsertionRow,
     this.onMeldTapped,
     this.onAreaTapped,
     this.orientation = MeldOrientation.horizontal,
@@ -315,14 +317,25 @@ class MeldAreaWidget extends StatelessWidget {
     final geometry = layout.geometry;
     final contentHeight = layout.rowCount * geometry.cardHeight +
         (layout.rowCount > 1 ? horizontalMeldRowGap : 0);
-    final showInsertionIndicator = layout.rowCount == 1 &&
-        newMeldInsertionIndex != null &&
-        newMeldInsertionIndex! <= layout.items.length;
-    final insertionX = showInsertionIndicator
-        ? newMeldInsertionIndex! == layout.items.length
-            ? layout.items.last.x + layout.items.last.width
-            : layout.items[newMeldInsertionIndex!].x
-        : null;
+    final showInsertionIndicator = newMeldInsertionIndex != null &&
+        newMeldInsertionRow != null &&
+        newMeldInsertionRow! < layout.rows.length;
+    final row = showInsertionIndicator ? layout.rows[newMeldInsertionRow!] : null;
+    final rowOffset = row == null
+        ? 0.0
+        : ((contentWidth - layout.rowWidths[newMeldInsertionRow!]) / 2)
+            .clamp(0, double.infinity)
+            .toDouble();
+    final insertionX = row == null
+        ? null
+        : newMeldInsertionIndex! <= row.first.meldIndex
+            ? rowOffset + row.first.x
+            : newMeldInsertionIndex! > row.last.meldIndex
+                ? rowOffset + row.last.x + row.last.width
+                : rowOffset +
+                    row.firstWhere(
+                      (item) => item.meldIndex >= newMeldInsertionIndex!,
+                    ).x;
 
     return Align(
       alignment: Alignment.topCenter,
@@ -407,7 +420,8 @@ class MeldAreaWidget extends StatelessWidget {
             if (insertionX != null)
               Positioned(
                 left: insertionX,
-                top: 0,
+                top: newMeldInsertionRow! *
+                    (geometry.cardHeight + horizontalMeldRowGap),
                 child: const _MeldInsertionIndicator(),
               ),
           ],
