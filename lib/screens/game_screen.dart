@@ -67,7 +67,6 @@ class _GameScreenState extends State<GameScreen> {
       hoveredMeldBefore = null;
       newMeldInsertionIndex = null;
       newMeldInsertionRow = null;
-      newMeldInsertionRow = null;
       _activeDragHandIndexes = null;
     });
   }
@@ -123,6 +122,7 @@ class _GameScreenState extends State<GameScreen> {
       hoveredMeldIndex = null;
       hoveredMeldBefore = null;
       newMeldInsertionIndex = null;
+      newMeldInsertionRow = null;
     });
   }
 
@@ -182,7 +182,8 @@ class _GameScreenState extends State<GameScreen> {
   void _clearHoveredMeld() {
     if (hoveredMeldIndex != null ||
         hoveredMeldBefore != null ||
-        newMeldInsertionIndex != null) {
+        newMeldInsertionIndex != null ||
+        newMeldInsertionRow != null) {
       setState(() {
         hoveredMeldIndex = null;
         hoveredMeldBefore = null;
