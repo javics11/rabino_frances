@@ -219,7 +219,21 @@ void main() {
         everyElement(closeTo(expected, 0.001)),
       );
     }
+    void expectPilesMatchMeldWidth(double expected) {
+      final pileGestures = find.descendant(
+        of: find.byKey(const ValueKey('four-player-piles')),
+        matching: find.byType(GestureDetector),
+      );
+      expect(pileGestures, findsNWidgets(2));
+      final pileWidths = [
+        for (final element in pileGestures.evaluate())
+          tester.getRect(find.byWidget(element.widget)).width,
+      ];
+      final expectedFootprint = expected + 2 * (expected / 20);
+      expect(pileWidths, everyElement(closeTo(expectedFootprint, 0.001)));
+    }
     expectAllMeldWidths(normalMeldWidth);
+    expectPilesMatchMeldWidth(normalMeldWidth);
 
     await _pumpFourPlayerBoard(
       tester,
@@ -238,6 +252,7 @@ void main() {
         .geometry
         .cardWidth;
     expectAllMeldWidths(moderateMeldWidth);
+    expectPilesMatchMeldWidth(moderateMeldWidth);
     expect(moderateMeldWidth, lessThan(normalMeldWidth));
     expect(moderateMeldHeight, lessThan(normalMeldHeight));
     expect(moderateHandWidth, closeTo(normalHandWidth, 0.001));
@@ -263,12 +278,39 @@ void main() {
     expect(shortMeldHeight, lessThanOrEqualTo(moderateMeldHeight));
     expect(shortHandWidth, lessThan(moderateHandWidth));
     expectAllMeldWidths(shortMeldWidth);
+    expectPilesMatchMeldWidth(shortMeldWidth);
     expect(
       tester.getRect(find.byKey(const ValueKey('human-hand-group'))).top,
       greaterThanOrEqualTo(
         tester.getRect(find.byKey(const ValueKey('human-meld-area'))).bottom,
       ),
     );
+  });
+
+  testWidgets('four-player horizontal board remains stable when constrained', (
+    tester,
+  ) async {
+    await _pumpFourPlayerBoard(
+      tester,
+      size: const Size(360, 640),
+      orientation: MeldOrientation.horizontal,
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(
+      tester.widgetList<MeldAreaWidget>(find.byType(MeldAreaWidget)).every(
+            (area) => area.orientation == MeldOrientation.horizontal,
+          ),
+      isTrue,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('four-player-piles')),
+        matching: find.byType(GestureDetector),
+      ),
+      findsNWidgets(2),
+    );
+    expect(find.byType(CompactAiStatus), findsNWidgets(3));
   });
 
   testWidgets('three-player board renders each seat and owned melds', (tester) async {
