@@ -112,10 +112,16 @@ class CompactAiStatus extends StatelessWidget {
 
   static const _countStyle = TextStyle(color: Colors.white, fontSize: 11);
 
-  Widget get _nameText => Text(
-        playerName,
-        key: const ValueKey('compact-ai-status-name'),
-        style: _nameStyle,
+  Widget get _nameText => FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.center,
+        child: Text(
+          playerName,
+          key: const ValueKey('compact-ai-status-name'),
+          maxLines: 1,
+          softWrap: false,
+          style: _nameStyle,
+        ),
       );
 
   Widget get _countText => Text(

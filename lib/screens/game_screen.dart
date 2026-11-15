@@ -21,6 +21,7 @@ import '../widgets/board_presentation_geometry.dart';
 import '../presentation/multiplayer_board_geometry.dart';
 import '../presentation/player_seat.dart';
 import '../presentation/four_player_table_geometry.dart';
+import '../services/player_name_settings.dart';
 
 Color _tableSurfaceColor() => Colors.green.shade200;
 
@@ -50,12 +51,14 @@ class GameScreen extends StatefulWidget {
   final Game game;
   final MeldOrientation initialMeldOrientation;
   final GamePersistence persistence;
+  final PlayerNameSettingsPersistence playerNameSettings;
 
   const GameScreen({
     super.key,
     required this.game,
     this.initialMeldOrientation = MeldOrientation.vertical,
     this.persistence = const SharedPreferencesGamePersistence(),
+    this.playerNameSettings = const SharedPreferencesPlayerNameSettings(),
   });
 
   @override
@@ -145,8 +148,10 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Future<void> _newGame() async {
+    final names = await widget.playerNameSettings.load();
     final newGame = GameFactory.createNewGame(
       playerCount: widget.game.players.length,
+      names: names,
     );
     await widget.persistence.saveGame(newGame);
     if (!mounted) return;
@@ -158,6 +163,7 @@ class _GameScreenState extends State<GameScreen> {
           game: newGame,
           initialMeldOrientation: meldOrientation,
           persistence: widget.persistence,
+          playerNameSettings: widget.playerNameSettings,
         ),
       ),
     );
@@ -174,7 +180,7 @@ class _GameScreenState extends State<GameScreen> {
       itemBuilder: (context) => [
         const PopupMenuItem(
           value: 'new_game',
-          child: Text('New Game'),
+          child: Text('Nueva partida'),
         ),
         PopupMenuItem(
           value: 'toggle_orientation',
@@ -411,6 +417,14 @@ class _GameScreenState extends State<GameScreen> {
                           alignment: Alignment.center,
                           children: [
                             opponentHand,
+                            Positioned(
+                              top: 0,
+                              left: 8,
+                              child: _buildCompactPlayerName(
+                                aiPlayer.name,
+                                handConstraints.maxWidth - 16,
+                              ),
+                            ),
                             if (showTitle)
                               const Positioned(
                                 left: 8,
@@ -444,7 +458,7 @@ class _GameScreenState extends State<GameScreen> {
                               key: const ValueKey('opponent-meld-area'),
                               areaKey: aiMeldAreaKey,
                               melds: aiPlayer.melds,
-                              emptyText: "AI MELDS",
+                              emptyText: 'Combinaciones de ${aiPlayer.name}',
                               orientation: meldOrientation,
                               geometry: opponentGeometry,
                               availableHeight: regionConstraints.maxHeight,
@@ -481,15 +495,17 @@ class _GameScreenState extends State<GameScreen> {
                           bottom: 0,
                           child: Align(
                             alignment: Alignment.centerLeft,
-                            child: Text(
-                              widget.game.currentPlayerIndex == 0
-                                  ? 'YOUR TURN'
-                                  : widget.game.players.length == 2
-                                      ? 'AI TURN'
-                                      : '${widget.game.currentPlayer.name.toUpperCase()} TURN',
-                              key: const ValueKey('turn-indicator'),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                'Turno de ${widget.game.currentPlayer.name}',
+                                key: const ValueKey('turn-indicator'),
+                                maxLines: 1,
+                                softWrap: false,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ),
@@ -513,7 +529,7 @@ class _GameScreenState extends State<GameScreen> {
                     hoveredMeldBefore: hoveredMeldBefore,
                     newMeldInsertionIndex: newMeldInsertionIndex,
                     newMeldInsertionRow: newMeldInsertionRow,
-                    emptyText: "MELDS",
+                    emptyText: 'Combinaciones de ${player.name}',
                     orientation: meldOrientation,
                     geometry: geometry,
                     availableHeight: regionConstraints.maxHeight,
@@ -784,6 +800,7 @@ class _GameScreenState extends State<GameScreen> {
                   geometry,
                   controlReserve,
                   availableHeight: geometry.cardHeight,
+                  playerName: player.name,
                 ),
                 ),
               ),
@@ -831,6 +848,7 @@ class _GameScreenState extends State<GameScreen> {
     Widget meldArea({
       required String keyName,
       required List<Meld> melds,
+      required String ownerName,
       required Rect region,
       GlobalKey? areaKey,
       List<GlobalKey>? meldKeys,
@@ -846,7 +864,7 @@ class _GameScreenState extends State<GameScreen> {
             meldKeys: meldKeys,
             meldCardKeys: meldCardKeys,
             melds: melds,
-            emptyText: interactive ? 'MELDS' : '',
+            emptyText: 'Combinaciones de $ownerName',
             orientation: meldOrientation,
             geometry: presentation.table,
             availableHeight: regionConstraints.maxHeight,
@@ -867,9 +885,7 @@ class _GameScreenState extends State<GameScreen> {
       );
     }
 
-    final turnLabel = widget.game.currentPlayerIndex == 0
-        ? 'YOUR TURN'
-        : '${widget.game.currentPlayer.name.toUpperCase()} TURN';
+    final turnLabel = 'Turno de ${widget.game.currentPlayer.name}';
 
     return Container(
       key: const ValueKey('table-surface'),
@@ -881,16 +897,19 @@ class _GameScreenState extends State<GameScreen> {
         meldArea(
           keyName: 'top-meld-area',
           melds: top.melds,
+          ownerName: top.name,
           region: board.topMeldRegion,
         ),
         meldArea(
           keyName: 'right-meld-area',
           melds: right.melds,
+          ownerName: right.name,
           region: board.rightMeldRegion,
         ),
         meldArea(
           keyName: 'human-meld-area',
           melds: human.melds,
+          ownerName: human.name,
           region: board.humanMeldRegion,
           areaKey: playerMeldAreaKey,
           meldKeys: playerMeldKeys,
@@ -902,7 +921,7 @@ class _GameScreenState extends State<GameScreen> {
           top: board.statusRegionFor(PlayerSeat.top)!.top,
           child: CompactAiStatus(
             key: const ValueKey('ai-2-status'),
-            playerName: 'AI 2',
+            playerName: top.name,
             cardCount: top.hand.length,
           ),
         ),
@@ -911,7 +930,7 @@ class _GameScreenState extends State<GameScreen> {
           top: board.statusRegionFor(PlayerSeat.right)!.top,
           child: CompactAiStatus(
             key: const ValueKey('ai-1-status'),
-            playerName: 'AI 1',
+            playerName: right.name,
             cardCount: right.hand.length,
           ),
         ),
@@ -937,6 +956,7 @@ class _GameScreenState extends State<GameScreen> {
             presentation.humanHand,
             board.humanControlsRegion.width,
             availableHeight: board.humanControlsRegion.height,
+            playerName: human.name,
           ),
         ),
         Positioned.fromRect(
@@ -1041,6 +1061,7 @@ class _GameScreenState extends State<GameScreen> {
     Widget meldArea({
       required String keyName,
       required List<Meld> melds,
+      required String ownerName,
       required Rect region,
       GlobalKey? areaKey,
       List<GlobalKey>? meldKeys,
@@ -1056,7 +1077,7 @@ class _GameScreenState extends State<GameScreen> {
             meldKeys: meldKeys,
             meldCardKeys: meldCardKeys,
             melds: melds,
-            emptyText: interactive ? 'MELDS' : '',
+            emptyText: 'Combinaciones de $ownerName',
             orientation: meldOrientation,
             geometry: sharedTableGeometry,
             availableHeight: regionConstraints.maxHeight,
@@ -1077,9 +1098,7 @@ class _GameScreenState extends State<GameScreen> {
       );
     }
 
-    final turnLabel = widget.game.currentPlayerIndex == 0
-        ? 'YOUR TURN'
-        : '${widget.game.currentPlayer.name.toUpperCase()} TURN';
+    final turnLabel = 'Turno de ${widget.game.currentPlayer.name}';
 
     return Container(
       key: const ValueKey('table-surface'),
@@ -1091,21 +1110,25 @@ class _GameScreenState extends State<GameScreen> {
           meldArea(
             keyName: 'top-meld-area',
             melds: top.melds,
+            ownerName: top.name,
             region: board.topMeldRegion,
           ),
           meldArea(
             keyName: 'right-meld-area',
             melds: right.melds,
+            ownerName: right.name,
             region: board.rightMeldRegion,
           ),
           meldArea(
             keyName: 'left-meld-area',
             melds: left.melds,
+            ownerName: left.name,
             region: board.leftMeldRegion!,
           ),
           meldArea(
             keyName: 'human-meld-area',
             melds: human.melds,
+            ownerName: human.name,
             region: board.humanMeldRegion,
             areaKey: playerMeldAreaKey,
             meldKeys: playerMeldKeys,
@@ -1116,7 +1139,7 @@ class _GameScreenState extends State<GameScreen> {
             rect: board.statusRegionFor(PlayerSeat.top)!,
             child: CompactAiStatus(
               key: const ValueKey('ai-2-status'),
-              playerName: 'AI 2',
+              playerName: top.name,
               cardCount: top.hand.length,
             ),
           ),
@@ -1124,7 +1147,7 @@ class _GameScreenState extends State<GameScreen> {
             rect: board.statusRegionFor(PlayerSeat.right)!,
             child: CompactAiStatus(
               key: const ValueKey('ai-1-status'),
-              playerName: 'AI 1',
+              playerName: right.name,
               cardCount: right.hand.length,
             ),
           ),
@@ -1132,7 +1155,7 @@ class _GameScreenState extends State<GameScreen> {
             rect: board.statusRegionFor(PlayerSeat.left)!,
             child: CompactAiStatus(
               key: const ValueKey('ai-3-status'),
-              playerName: 'AI 3',
+              playerName: left.name,
               cardCount: left.hand.length,
             ),
           ),
@@ -1158,6 +1181,7 @@ class _GameScreenState extends State<GameScreen> {
               presentation.humanHand,
               board.humanControlsRegion.width,
               availableHeight: board.humanControlsRegion.height,
+              playerName: human.name,
             ),
           ),
           Positioned.fromRect(
@@ -1234,6 +1258,7 @@ class _GameScreenState extends State<GameScreen> {
     CardGeometry geometry,
     double width,
     {double? availableHeight,
+    String? playerName,
   }) {
     final compactControls = width < 50;
     final narrowControls = !compactControls && width < 80;
@@ -1249,9 +1274,18 @@ class _GameScreenState extends State<GameScreen> {
             : 'Sort Rank';
     final clearLabel = compactControls ? '\u00D7' : 'Clear';
     const interButtonGap = 1.0;
+    const minimumControlHeight = 20.0;
+    final availableNameHeight = availableHeight == null
+        ? double.infinity
+        : availableHeight -
+            interButtonGap * 3 -
+            minimumControlHeight * 4;
+    final nameReserve = playerName == null
+        ? 0.0
+        : availableNameHeight.clamp(0.0, 18.0).toDouble();
     final controlHeight = availableHeight == null
         ? 26.0
-        : ((availableHeight - interButtonGap * 3) / 4)
+        : ((availableHeight - nameReserve - interButtonGap * 3) / 4)
             .clamp(1.0, 28.0)
             .toDouble();
     final controlStyle = ElevatedButton.styleFrom(
@@ -1268,6 +1302,11 @@ class _GameScreenState extends State<GameScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (playerName != null)
+            SizedBox(
+              height: nameReserve,
+              child: _buildCompactPlayerName(playerName, width),
+            ),
           ElevatedButton(
             key: const ValueKey('sort-suit-button'),
             style: controlStyle,
@@ -1305,6 +1344,23 @@ class _GameScreenState extends State<GameScreen> {
                 : const Text('Undo'),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCompactPlayerName(String name, double width) {
+    return SizedBox(
+      width: width,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.center,
+        child: Text(
+          name,
+          key: ValueKey('player-name-$name'),
+          maxLines: 1,
+          softWrap: false,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+        ),
       ),
     );
   }

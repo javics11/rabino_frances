@@ -179,7 +179,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('options-menu')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('New Game'));
+    await tester.tap(find.text('Nueva partida'));
     await tester.pumpAndSettle();
 
     expect(
@@ -202,6 +202,11 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(const ValueKey('game-title')), findsOneWidget);
+    expect(find.text('You'), findsOneWidget);
+    expect(find.text('Evaristo'), findsOneWidget);
+    expect(find.text('Combinaciones de You'), findsOneWidget);
+    expect(find.text('Combinaciones de Evaristo'), findsOneWidget);
+    expect(find.text('Turno de You'), findsOneWidget);
     expect(find.byType(AppBar), findsNothing);
     expect(find.byKey(const ValueKey('options-menu')), findsOneWidget);
     expect(

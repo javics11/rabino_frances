@@ -22,25 +22,27 @@ CardModel _card(int id, int rank) => CardModel(
       suit: SpanishSuit.bastos,
     );
 
-Game _threePlayerGame({int humanCardCount = 1}) {
-  final players = [Player('You'), Player('AI 1'), Player('AI 2')];
+Game _threePlayerGame({int humanCardCount = 1, bool includeMelds = true}) {
+  final players = [Player('Javier'), Player('Esperanza'), Player('Evaristo')];
   for (var index = 0; index < humanCardCount; index++) {
     players[0].hand.add(_card(10 + index, index % 13 + 1));
   }
   players[1].hand.addAll([_card(20, 1), _card(21, 2), _card(22, 3)]);
   players[2].hand.addAll([_card(30, 1), _card(31, 2), _card(32, 3)]);
-  players[0].melds.add(Meld(cards: [_card(100, 1), _card(101, 2), _card(102, 3)]));
-  players[1].melds.add(Meld(cards: [_card(200, 4), _card(201, 5), _card(202, 6)]));
-  players[2].melds.add(Meld(cards: [_card(300, 7), _card(301, 8), _card(302, 9)]));
+  if (includeMelds) {
+    players[0].melds.add(Meld(cards: [_card(100, 1), _card(101, 2), _card(102, 3)]));
+    players[1].melds.add(Meld(cards: [_card(200, 4), _card(201, 5), _card(202, 6)]));
+    players[2].melds.add(Meld(cards: [_card(300, 7), _card(301, 8), _card(302, 9)]));
+  }
   return Game(deck: Deck(), players: players);
 }
 
-Game _fourPlayerGame({bool includeHumanMeld = true}) {
+Game _fourPlayerGame({bool includeHumanMeld = true, bool includeMelds = true}) {
   final players = [
-    Player('You'),
-    Player('AI 1'),
-    Player('AI 2'),
-    Player('AI 3'),
+    Player('Javier'),
+    Player('Esperanza'),
+    Player('Evaristo'),
+    Player('Carmen'),
   ];
   players[0].hand.add(_card(10, 1));
   for (var playerIndex = 1; playerIndex < players.length; playerIndex++) {
@@ -49,15 +51,17 @@ Game _fourPlayerGame({bool includeHumanMeld = true}) {
       _card(playerIndex * 10 + 1, 2),
       _card(playerIndex * 10 + 2, 3),
     ]);
-    players[playerIndex].melds.add(
-      Meld(cards: [
-        _card(playerIndex * 100, 4),
-        _card(playerIndex * 100 + 1, 5),
-        _card(playerIndex * 100 + 2, 6),
-      ]),
-    );
+    if (includeMelds) {
+      players[playerIndex].melds.add(
+        Meld(cards: [
+          _card(playerIndex * 100, 4),
+          _card(playerIndex * 100 + 1, 5),
+          _card(playerIndex * 100 + 2, 6),
+        ]),
+      );
+    }
   }
-  if (includeHumanMeld) {
+  if (includeMelds && includeHumanMeld) {
     players[0].melds.add(
       Meld(cards: [_card(1000, 7), _card(1001, 8), _card(1002, 9)]),
     );
@@ -111,9 +115,9 @@ void main() {
 
     expect(find.byKey(const ValueKey('four-player-board')), findsOneWidget);
     expect(find.byType(CompactAiStatus), findsNWidgets(3));
-    expect(find.text('AI 1'), findsOneWidget);
-    expect(find.text('AI 2'), findsOneWidget);
-    expect(find.text('AI 3'), findsOneWidget);
+    expect(find.text('Esperanza'), findsOneWidget);
+    expect(find.text('Evaristo'), findsOneWidget);
+    expect(find.text('Carmen'), findsOneWidget);
     expect(find.byKey(const ValueKey('left-meld-area')), findsOneWidget);
     expect(find.byKey(const ValueKey('right-meld-area')), findsOneWidget);
     expect(find.byKey(const ValueKey('top-meld-area')), findsOneWidget);
@@ -124,7 +128,7 @@ void main() {
     final statuses = tester.widgetList<CompactAiStatus>(find.byType(CompactAiStatus));
     expect(
       statuses.map((status) => '${status.playerName}:${status.cardCount}'),
-      containsAll(<String>['AI 1:3', 'AI 2:3', 'AI 3:3']),
+      containsAll(<String>['Esperanza:3', 'Evaristo:3', 'Carmen:3']),
     );
     expect(find.byKey(const ValueKey('human-hand-group')), findsOneWidget);
     expect(find.byKey(const ValueKey('sort-suit-button')), findsOneWidget);
@@ -333,12 +337,12 @@ void main() {
     expect(find.byKey(const ValueKey('right-meld-area')), findsOneWidget);
     expect(find.byKey(const ValueKey('top-meld-area')), findsOneWidget);
     expect(find.byType(CompactAiStatus), findsNWidgets(2));
-    expect(find.text('AI 1'), findsOneWidget);
-    expect(find.text('AI 2'), findsOneWidget);
+    expect(find.text('Esperanza'), findsOneWidget);
+    expect(find.text('Evaristo'), findsOneWidget);
     final statuses = tester.widgetList<CompactAiStatus>(find.byType(CompactAiStatus));
     expect(
       statuses.map((status) => '${status.playerName}:${status.cardCount}'),
-      containsAll(<String>['AI 1:3', 'AI 2:3']),
+      containsAll(<String>['Esperanza:3', 'Evaristo:3']),
     );
     expect(find.byType(CardBackWidget), findsNothing);
     final humanHand = tester.widget<PlayerHandWidget>(
@@ -372,6 +376,25 @@ void main() {
     expect(visibleIds, contains(10));
   });
 
+  testWidgets('three-player empty meld areas identify their owners', (tester) async {
+    final game = _threePlayerGame(includeMelds: false);
+    await tester.pumpWidget(MaterialApp(home: GameScreen(game: game)));
+    await tester.pump();
+    expect(find.text('Combinaciones de Javier'), findsOneWidget);
+    expect(find.text('Combinaciones de Esperanza'), findsOneWidget);
+    expect(find.text('Combinaciones de Evaristo'), findsOneWidget);
+  });
+
+  testWidgets('four-player empty meld areas identify their owners', (tester) async {
+    final game = _fourPlayerGame(includeMelds: false);
+    await tester.pumpWidget(MaterialApp(home: GameScreen(game: game)));
+    await tester.pump();
+    expect(find.text('Combinaciones de Javier'), findsOneWidget);
+    expect(find.text('Combinaciones de Esperanza'), findsOneWidget);
+    expect(find.text('Combinaciones de Evaristo'), findsOneWidget);
+    expect(find.text('Combinaciones de Carmen'), findsOneWidget);
+  });
+
   testWidgets('three-player board builds in both meld orientations', (tester) async {
     await _pumpThreePlayerBoard(tester, orientation: MeldOrientation.horizontal);
     expect(tester.takeException(), isNull);
@@ -385,7 +408,7 @@ void main() {
     await _pumpThreePlayerBoard(tester);
     await tester.tap(find.byKey(const ValueKey('options-menu')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('New Game'));
+    await tester.tap(find.text('Nueva partida'));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('three-player-board')), findsOneWidget);
@@ -399,7 +422,7 @@ void main() {
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('options-menu')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('New Game'));
+    await tester.tap(find.text('Nueva partida'));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('three-player-board')), findsNothing);
@@ -425,12 +448,12 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(const ValueKey('options-menu')), findsOneWidget);
-    expect(find.text('YOUR TURN'), findsOneWidget);
+    expect(find.text('Turno de Javier'), findsOneWidget);
     expect(game.currentPlayerIndex, 0);
 
     await tester.tap(find.byKey(const ValueKey('options-menu')));
     await tester.pumpAndSettle();
-    expect(find.text('New Game'), findsOneWidget);
+    expect(find.text('Nueva partida'), findsOneWidget);
     expect(find.text('Horizontal'), findsOneWidget);
 
     await tester.tap(find.text('Horizontal'));

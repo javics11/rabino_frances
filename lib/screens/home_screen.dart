@@ -2,12 +2,19 @@ import 'package:flutter/material.dart';
 
 import '../services/game_factory.dart';
 import '../services/game_persistence.dart';
+import '../services/player_name_settings.dart';
 import 'game_screen.dart';
 import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final GamePersistence persistence;
-  const HomeScreen({super.key, this.persistence = const SharedPreferencesGamePersistence()});
+  final PlayerNameSettingsPersistence playerNameSettings;
+
+  const HomeScreen({
+    super.key,
+    this.persistence = const SharedPreferencesGamePersistence(),
+    this.playerNameSettings = const SharedPreferencesPlayerNameSettings(),
+  });
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -26,11 +33,19 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _startNewGame() async {
-    final game = GameFactory.createNewGame(playerCount: selectedPlayerCount);
+    final names = await widget.playerNameSettings.load();
+    final game = GameFactory.createNewGame(
+      playerCount: selectedPlayerCount,
+      names: names,
+    );
     await widget.persistence.saveGame(game);
     if (!mounted) return;
     Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => GameScreen(game: game, persistence: widget.persistence),
+      builder: (_) => GameScreen(
+        game: game,
+        persistence: widget.persistence,
+        playerNameSettings: widget.playerNameSettings,
+      ),
     )).then((_) => _refreshSavedGame());
   }
 
@@ -45,7 +60,11 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
     Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => GameScreen(game: game, persistence: widget.persistence),
+      builder: (_) => GameScreen(
+        game: game,
+        persistence: widget.persistence,
+        playerNameSettings: widget.playerNameSettings,
+      ),
     )).then((_) => _refreshSavedGame());
   }
 
@@ -95,7 +114,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     OutlinedButton(
                       key: const ValueKey('settings-button'),
                       onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                        MaterialPageRoute(
+                          builder: (_) => SettingsScreen(
+                            persistence: widget.playerNameSettings,
+                          ),
+                        ),
                       ),
                       child: const Text('Ajustes'),
                     ),

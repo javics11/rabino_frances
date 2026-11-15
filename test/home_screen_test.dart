@@ -3,11 +3,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rabino_frances/screens/game_screen.dart';
 import 'package:rabino_frances/screens/home_screen.dart';
 import 'package:rabino_frances/services/game_persistence.dart';
+import 'package:rabino_frances/services/game_factory.dart';
+import 'package:rabino_frances/services/player_name_settings.dart';
+import 'package:rabino_frances/widgets/meld_orientation.dart';
 
 void main() {
   Future<void> pumpHome(WidgetTester tester) async {
     await tester.pumpWidget(
-      MaterialApp(home: HomeScreen(persistence: InMemoryGamePersistence())),
+      MaterialApp(
+        home: HomeScreen(
+          persistence: InMemoryGamePersistence(),
+          playerNameSettings: InMemoryPlayerNameSettings(),
+        ),
+      ),
     );
     await tester.pumpAndSettle();
   }
@@ -58,8 +66,14 @@ void main() {
 
   testWidgets('four-player selection launches a real four-player game', (tester) async {
     final persistence = InMemoryGamePersistence();
+    final names = InMemoryPlayerNameSettings();
     await tester.pumpWidget(
-      MaterialApp(home: HomeScreen(persistence: persistence)),
+      MaterialApp(
+        home: HomeScreen(
+          persistence: persistence,
+          playerNameSettings: names,
+        ),
+      ),
     );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('player-count-selector')));
@@ -71,6 +85,9 @@ void main() {
 
     final gameScreen = tester.widget<GameScreen>(find.byType(GameScreen));
     expect(gameScreen.game.players, hasLength(4));
+    expect(gameScreen.game.players.map((player) => player.name), [
+      'You', 'Esperanza', 'Evaristo', 'Carmen',
+    ]);
     expect(await persistence.hasSavedGame(), isTrue);
     expect((await persistence.loadGame())!.players, hasLength(4));
   });
@@ -94,7 +111,14 @@ void main() {
 
   testWidgets('selected three-player count reaches game creation', (tester) async {
     final persistence = InMemoryGamePersistence();
-    await tester.pumpWidget(MaterialApp(home: HomeScreen(persistence: persistence)));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          persistence: persistence,
+          playerNameSettings: InMemoryPlayerNameSettings(),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('player-count-selector')));
     await tester.pumpAndSettle();
@@ -105,7 +129,87 @@ void main() {
 
     final gameScreen = tester.widget<GameScreen>(find.byType(GameScreen));
     expect(gameScreen.game.players, hasLength(3));
+    expect(gameScreen.game.players.map((player) => player.name), [
+      'You', 'Esperanza', 'Evaristo',
+    ]);
     expect(await persistence.hasSavedGame(), isTrue);
     expect((await persistence.loadGame())!.players, hasLength(3));
+  });
+
+  testWidgets('custom names flow from Home into a new game', (tester) async {
+    final names = InMemoryPlayerNameSettings();
+    await names.save(const PlayerNameSettings(
+      bottom: 'Javier',
+      right: 'Esperanza',
+      top: 'Evaristo',
+      left: 'Carmen',
+    ));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          persistence: InMemoryGamePersistence(),
+          playerNameSettings: names,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('player-count-selector')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('4').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('new-game-button')));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<GameScreen>(find.byType(GameScreen)).game.players.map(
+            (player) => player.name,
+          ),
+      ['Javier', 'Esperanza', 'Evaristo', 'Carmen'],
+    );
+  });
+
+  testWidgets('in-game New Game uses current names and preserves orientation', (
+    tester,
+  ) async {
+    final names = InMemoryPlayerNameSettings();
+    final persistence = InMemoryGamePersistence();
+    await names.save(const PlayerNameSettings(
+      bottom: 'Javier',
+      right: 'Esperanza',
+      top: 'Evaristo',
+      left: 'Carmen',
+    ));
+    expect((await names.load()).bottom, 'Javier');
+    final oldGame = GameFactory.createNewGame(playerCount: 3);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GameScreen(
+          game: oldGame,
+          initialMeldOrientation: MeldOrientation.horizontal,
+          persistence: persistence,
+          playerNameSettings: names,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('options-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Nueva partida'));
+    await tester.pumpAndSettle();
+
+    final savedGame = await persistence.loadGame();
+    expect(savedGame, isNotNull);
+    expect(savedGame!.players.map((player) => player.name), [
+      'Javier', 'Esperanza', 'Evaristo',
+    ]);
+
+    final newScreen = tester.widget<GameScreen>(find.byType(GameScreen));
+    expect(newScreen.game.players, hasLength(3));
+    expect(newScreen.game.players.map((player) => player.name), [
+      'Javier', 'Esperanza', 'Evaristo',
+    ]);
+    expect(identical(newScreen.game, oldGame), isFalse);
+    expect(newScreen.initialMeldOrientation, MeldOrientation.horizontal);
+    expect(identical(newScreen.playerNameSettings, names), isTrue);
   });
 }
