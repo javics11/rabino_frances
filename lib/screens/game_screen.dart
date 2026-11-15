@@ -6,6 +6,7 @@ import '../widgets/player_hand_widget.dart';
 import '../widgets/meld_area_widget.dart';
 import '../services/drag_drop_service.dart';
 import '../services/game_service.dart';
+import '../services/game_persistence.dart';
 import '../services/ai_service.dart';
 import '../rules/rabino_rules.dart';
 import '../widgets/meld_orientation.dart';
@@ -17,11 +18,13 @@ import '../widgets/board_presentation_geometry.dart';
 class GameScreen extends StatefulWidget {
   final Game game;
   final MeldOrientation initialMeldOrientation;
+  final GamePersistence persistence;
 
   const GameScreen({
     super.key,
     required this.game,
     this.initialMeldOrientation = MeldOrientation.vertical,
+    this.persistence = const SharedPreferencesGamePersistence(),
   });
 
   @override
@@ -53,7 +56,10 @@ class _GameScreenState extends State<GameScreen> {
 
     meldOrientation = widget.initialMeldOrientation;
 
-    gameService = GameService(game: widget.game);
+    gameService = GameService(
+      game: widget.game,
+      onChanged: _persistGame,
+    );
 
     aiService = AiService(game: widget.game);
   }
@@ -69,6 +75,10 @@ class _GameScreenState extends State<GameScreen> {
       newMeldInsertionRow = null;
       _activeDragHandIndexes = null;
     });
+  }
+
+  void _persistGame() {
+    widget.persistence.saveGame(widget.game);
   }
 
   void _sortByRank() {
@@ -100,8 +110,10 @@ class _GameScreenState extends State<GameScreen> {
     });
   }
 
-  void _newGame() {
+  Future<void> _newGame() async {
     final newGame = GameFactory.createNewGame();
+    await widget.persistence.saveGame(newGame);
+    if (!mounted) return;
 
     Navigator.pushReplacement(
       context,
@@ -109,6 +121,7 @@ class _GameScreenState extends State<GameScreen> {
         builder: (_) => GameScreen(
           game: newGame,
           initialMeldOrientation: meldOrientation,
+          persistence: widget.persistence,
         ),
       ),
     );
@@ -242,8 +255,9 @@ class _GameScreenState extends State<GameScreen> {
     }
 
     return Scaffold(
-      body: LayoutBuilder(
-        builder: (context, constraints) {
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
           final presentationGeometry =
               BoardPresentationGeometry.fromConstraints(
             width: constraints.maxWidth,
@@ -809,7 +823,8 @@ class _GameScreenState extends State<GameScreen> {
 
             ],
           );
-        },
+          },
+        ),
       ),
     );
   }
@@ -941,6 +956,7 @@ class _GameScreenState extends State<GameScreen> {
       setState(() {
         aiService.playTurn();
       });
+      _persistGame();
     });
   }
 }

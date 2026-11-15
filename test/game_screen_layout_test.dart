@@ -113,6 +113,28 @@ Rect _humanCardRectById(WidgetTester tester, int cardId) {
 }
 
 void main() {
+  testWidgets('gameplay board stays inside safe-area insets', (tester) async {
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(
+          size: Size(800, 600),
+          padding: EdgeInsets.fromLTRB(12, 24, 12, 36),
+        ),
+        child: MaterialApp(
+          home: GameScreen(game: GameFactory.createInitialGame()),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final opponent = tester.getRect(find.byKey(const ValueKey('opponent-hand-band')));
+    final human = tester.getRect(find.byKey(const ValueKey('human-hand-band')));
+    expect(opponent.top, greaterThanOrEqualTo(24));
+    expect(human.bottom, lessThanOrEqualTo(600 - 36));
+    expect(opponent.left, greaterThanOrEqualTo(12));
+    expect(human.right, lessThanOrEqualTo(800 - 12));
+  });
+
   testWidgets('meld orientation toggle is presentation-only and survives new game', (
     tester,
   ) async {

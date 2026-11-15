@@ -6,9 +6,10 @@ import 'sort_service.dart';
 class GameService {
   static const int maxUndoHistory = 5;
   final Game game;
+  final void Function()? onChanged;
   final List<Game> _undoHistory = [];
 
-  GameService({required this.game});
+  GameService({required this.game, this.onChanged});
 
   bool get canUndo => _undoHistory.isNotEmpty;
 
@@ -17,6 +18,7 @@ class GameService {
   bool undo() {
     if (_undoHistory.isEmpty) return false;
     game.restoreFrom(_undoHistory.removeLast());
+    onChanged?.call();
     return true;
   }
 
@@ -37,6 +39,7 @@ class GameService {
     final snapshot = game.deepCopy();
     game.drawCard();
     _record(snapshot);
+    onChanged?.call();
 
     return true;
   }
@@ -53,6 +56,7 @@ class GameService {
     final snapshot = game.deepCopy();
     game.drawFromDiscard();
     _record(snapshot);
+    onChanged?.call();
 
     return true;
   }
@@ -71,6 +75,7 @@ class GameService {
     final snapshot = game.deepCopy();
     game.discardCard(index);
     _record(snapshot);
+    onChanged?.call();
 
     return true;
   }
@@ -79,6 +84,7 @@ class GameService {
     final snapshot = game.deepCopy();
     final success = game.createMeld(handIndexes, insertionIndex: insertionIndex);
     if (success) _record(snapshot);
+    if (success) onChanged?.call();
     return success;
   }
 
@@ -92,6 +98,7 @@ class GameService {
       insertionIndex: insertionIndex,
     );
     if (result.success) _record(snapshot);
+    if (result.success) onChanged?.call();
     return result;
   }
 
@@ -107,6 +114,7 @@ class GameService {
       insertionIndex: insertionIndex,
     );
     if (success) _record(snapshot);
+    if (success) onChanged?.call();
     return success;
   }
 
@@ -125,6 +133,7 @@ class GameService {
     final snapshot = game.deepCopy();
     final success = game.applyMeldAddition(meldIndex, handIndexes, alternative);
     if (success) _record(snapshot);
+    if (success) onChanged?.call();
     return success;
   }
 
