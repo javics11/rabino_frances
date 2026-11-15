@@ -7,8 +7,31 @@ import 'package:rabino_frances/models/meld.dart';
 import 'package:rabino_frances/models/player.dart';
 import 'package:rabino_frances/models/spanish_suit.dart';
 import 'package:rabino_frances/services/game_persistence.dart';
+import 'package:rabino_frances/services/game_factory.dart';
 
 void main() {
+  for (final playerCount in [2, 3, 4]) {
+    test('SharedPreferences round-trips $playerCount players', () async {
+      SharedPreferences.setMockInitialValues({});
+      final game = GameFactory.createNewGame(playerCount: playerCount);
+      game.currentPlayerIndex = playerCount - 1;
+      game.firstTurnOfRound = false;
+      game.hasDrawnThisTurn = true;
+
+      final persistence = const SharedPreferencesGamePersistence();
+      await persistence.saveGame(game);
+      final restored = await persistence.loadGame();
+
+      expect(restored, isNotNull);
+      expect(restored!.players.map((player) => player.name),
+          game.players.map((player) => player.name));
+      expect(restored.players, hasLength(playerCount));
+      expect(restored.currentPlayerIndex, playerCount - 1);
+      expect(restored.firstTurnOfRound, isFalse);
+      expect(restored.hasDrawnThisTurn, isTrue);
+    });
+  }
+
   test('SharedPreferences persistence round-trips JSON game state', () async {
     SharedPreferences.setMockInitialValues({});
     final game = Game(deck: Deck(), players: [Player('You'), Player('AI')]);

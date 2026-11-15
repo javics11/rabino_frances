@@ -56,8 +56,12 @@ void main() {
     );
   });
 
-  testWidgets('unsupported player counts do not launch a game', (tester) async {
-    await pumpHome(tester);
+  testWidgets('four-player selection launches a real four-player game', (tester) async {
+    final persistence = InMemoryGamePersistence();
+    await tester.pumpWidget(
+      MaterialApp(home: HomeScreen(persistence: persistence)),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('player-count-selector')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('4').last);
@@ -65,9 +69,10 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('new-game-button')));
     await tester.pumpAndSettle();
 
-    expect(find.byType(HomeScreen), findsOneWidget);
-    expect(find.byType(GameScreen), findsNothing);
-    expect(find.textContaining('4 jugadores'), findsOneWidget);
+    final gameScreen = tester.widget<GameScreen>(find.byType(GameScreen));
+    expect(gameScreen.game.players, hasLength(4));
+    expect(await persistence.hasSavedGame(), isTrue);
+    expect((await persistence.loadGame())!.players, hasLength(4));
   });
 
   testWidgets('settings opens and back returns to the menu', (tester) async {
@@ -85,5 +90,22 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('new-game-button')));
     await tester.pumpAndSettle();
     expect(find.byType(GameScreen), findsOneWidget);
+  });
+
+  testWidgets('selected three-player count reaches game creation', (tester) async {
+    final persistence = InMemoryGamePersistence();
+    await tester.pumpWidget(MaterialApp(home: HomeScreen(persistence: persistence)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('player-count-selector')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('3').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('new-game-button')));
+    await tester.pumpAndSettle();
+
+    final gameScreen = tester.widget<GameScreen>(find.byType(GameScreen));
+    expect(gameScreen.game.players, hasLength(3));
+    expect(await persistence.hasSavedGame(), isTrue);
+    expect((await persistence.loadGame())!.players, hasLength(3));
   });
 }

@@ -105,7 +105,9 @@ Game _decodeGame(dynamic value) {
   final map = _map(value);
   if (map['version'] != 1) throw const FormatException('Unsupported save version');
   final players = (_list(map['players'])).map(_decodePlayer).toList();
-  if (players.length != 2) throw const FormatException('Invalid player count');
+  if (players.length < 2 || players.length > 4) {
+    throw const FormatException('Invalid player count');
+  }
   final deck = Deck()..cards.clear();
   deck.cards.addAll((_list(map['deck'])).map(_decodeCard));
   final game = Game(

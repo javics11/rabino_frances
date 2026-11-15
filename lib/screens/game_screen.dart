@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../models/game.dart';
+import '../models/player.dart';
+import '../models/meld.dart';
+import '../models/card.dart';
 import '../services/game_factory.dart';
 import '../widgets/player_hand_widget.dart';
 import '../widgets/meld_area_widget.dart';
@@ -11,9 +14,36 @@ import '../services/ai_service.dart';
 import '../rules/rabino_rules.dart';
 import '../widgets/meld_orientation.dart';
 import '../widgets/card_widget.dart';
+import '../widgets/compact_ai_status.dart';
 import '../widgets/card_geometry.dart';
 import '../widgets/hand_layout.dart';
 import '../widgets/board_presentation_geometry.dart';
+import '../presentation/multiplayer_board_geometry.dart';
+import '../presentation/player_seat.dart';
+
+Color _tableSurfaceColor() => Colors.green.shade200;
+
+double _humanControlReserve({
+  required double boardWidth,
+  required int handLength,
+  required CardGeometry geometry,
+}) {
+  final naturalHandWidth = HandLayout.fittedWidth(
+    handLength,
+    geometry,
+    double.infinity,
+  );
+
+  bool fits(double controlWidth) {
+    const gap = 8.0;
+    final handRight = boardWidth / 2 + naturalHandWidth / 2;
+    return handRight + gap <= boardWidth - controlWidth;
+  }
+
+  if (fits(96.0)) return 96.0;
+  if (fits(60.0)) return 60.0;
+  return 40.0;
+}
 
 class GameScreen extends StatefulWidget {
   final Game game;
@@ -62,6 +92,9 @@ class _GameScreenState extends State<GameScreen> {
     );
 
     aiService = AiService(game: widget.game);
+    if (widget.game.currentPlayerIndex != 0) {
+      _playAiTurn();
+    }
   }
 
   void _toggleMeldOrientation() {
@@ -111,7 +144,9 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Future<void> _newGame() async {
-    final newGame = GameFactory.createNewGame();
+    final newGame = GameFactory.createNewGame(
+      playerCount: widget.game.players.length,
+    );
     await widget.persistence.saveGame(newGame);
     if (!mounted) return;
 
@@ -124,6 +159,31 @@ class _GameScreenState extends State<GameScreen> {
           persistence: widget.persistence,
         ),
       ),
+    );
+  }
+
+  Widget _buildOptionsMenu() {
+    return PopupMenuButton<String>(
+      key: const ValueKey('options-menu'),
+      padding: EdgeInsets.zero,
+      onSelected: (value) {
+        if (value == 'new_game') _newGame();
+        if (value == 'toggle_orientation') _toggleMeldOrientation();
+      },
+      itemBuilder: (context) => [
+        const PopupMenuItem(
+          value: 'new_game',
+          child: Text('New Game'),
+        ),
+        PopupMenuItem(
+          value: 'toggle_orientation',
+          child: Text(
+            meldOrientation == MeldOrientation.vertical
+                ? 'Horizontal'
+                : 'Vertical',
+          ),
+        ),
+      ],
     );
   }
 
@@ -258,6 +318,9 @@ class _GameScreenState extends State<GameScreen> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
+          if (widget.game.players.length == 3) {
+            return _buildThreePlayerBoard(constraints);
+          }
           final presentationGeometry =
               BoardPresentationGeometry.fromConstraints(
             width: constraints.maxWidth,
@@ -276,60 +339,17 @@ class _GameScreenState extends State<GameScreen> {
           final geometry = presentationGeometry.humanHand;
           final opponentGeometry = presentationGeometry.opponentHand;
           final centreGeometry = presentationGeometry.centre;
-          final controlHeight =
-              ((geometry.cardHeight - 4) / 3).clamp(26.0, 40.0).toDouble();
-          final controlStyle = ElevatedButton.styleFrom(
-            minimumSize: Size(0, controlHeight),
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            visualDensity: VisualDensity.compact,
-          );
           final boardWidth = constraints.maxWidth;
           final naturalHandWidth = HandLayout.fittedWidth(
             player.hand.length,
             geometry,
             double.infinity,
           );
-          const wideControlWidth = 96.0;
-          const narrowControlWidth = 60.0;
-          const compactControlWidth = 40.0;
-          bool fitsNaturalHand(double controlWidth) {
-            const gap = 8.0;
-            final handRight = boardWidth / 2 + naturalHandWidth / 2;
-            return handRight + gap <= boardWidth - controlWidth;
-          }
-
-          final wideControls = fitsNaturalHand(wideControlWidth);
-          final narrowControls =
-              !wideControls && fitsNaturalHand(narrowControlWidth);
-          final compactControls = !wideControls && !narrowControls;
-          final controlReserve = wideControls
-              ? wideControlWidth
-              : narrowControls
-                  ? narrowControlWidth
-                  : compactControlWidth;
-          final legacySortSuitLabel = compactControls
-              ? '♣'
-              : narrowControls
-                  ? 'Suit'
-                  : 'Sort Suit';
-          final legacySortRankLabel = compactControls
-              ? '↕'
-              : narrowControls
-                  ? 'Rank'
-                  : 'Sort Rank';
-          final clearLabel = compactControls ? '×' : 'Clear';
-          final sortSuitLabel = wideControls
-              ? 'Sort Suit'
-              : narrowControls
-                  ? 'Suit'
-                  : legacySortSuitLabel;
-          final sortRankLabel = wideControls
-              ? 'Sort Rank'
-              : narrowControls
-                  ? 'Rank'
-                  : legacySortRankLabel;
-          final displayedClearLabel = compactControls ? '×' : clearLabel;
+          final controlReserve = _humanControlReserve(
+            boardWidth: boardWidth,
+            handLength: player.hand.length,
+            geometry: geometry,
+          );
 
           double collisionAvailableWidth(
             double naturalWidth,
@@ -348,7 +368,8 @@ class _GameScreenState extends State<GameScreen> {
             children: [
           Expanded(
             child: Container(
-              color: Colors.green.shade200,
+              key: const ValueKey('table-surface'),
+              color: _tableSurfaceColor(),
               child: Column(
                 children: [
                   LayoutBuilder(
@@ -402,30 +423,7 @@ class _GameScreenState extends State<GameScreen> {
                             Positioned(
                               right: 4,
                               top: 0,
-                              child: PopupMenuButton<String>(
-                                key: const ValueKey('options-menu'),
-                                padding: EdgeInsets.zero,
-                                onSelected: (value) {
-                                  if (value == 'new_game') _newGame();
-                                  if (value == 'toggle_orientation') {
-                                    _toggleMeldOrientation();
-                                  }
-                                },
-                                itemBuilder: (context) => [
-                                  const PopupMenuItem(
-                                    value: 'new_game',
-                                    child: Text('New Game'),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'toggle_orientation',
-                                    child: Text(
-                                      meldOrientation == MeldOrientation.vertical
-                                          ? 'Horizontal'
-                                          : 'Vertical',
-                                    ),
-                                  ),
-                                ],
-                              ),
+                              child: _buildOptionsMenu(),
                             ),
                           ],
                         ),
@@ -482,7 +480,9 @@ class _GameScreenState extends State<GameScreen> {
                             child: Text(
                               widget.game.currentPlayerIndex == 0
                                   ? 'YOUR TURN'
-                                  : 'AI TURN',
+                                  : widget.game.players.length == 2
+                                      ? 'AI TURN'
+                                      : '${widget.game.currentPlayer.name.toUpperCase()} TURN',
                               key: const ValueKey('turn-indicator'),
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
@@ -519,7 +519,8 @@ class _GameScreenState extends State<GameScreen> {
                         : null,
 
                     onMeldTapped: (meldIndex, position) {
-                      if (selectedCardIndexes.isEmpty) {
+                      if (widget.game.currentPlayerIndex != 0 ||
+                          selectedCardIndexes.isEmpty) {
                         return;
                       }
 
@@ -566,7 +567,8 @@ class _GameScreenState extends State<GameScreen> {
                       if (!success) _showMeldRejection();
                     },
                     onAreaTapped: (position) {
-                      if (selectedCardIndexes.isEmpty) {
+                      if (widget.game.currentPlayerIndex != 0 ||
+                          selectedCardIndexes.isEmpty) {
                         return;
                       }
 
@@ -655,6 +657,9 @@ class _GameScreenState extends State<GameScreen> {
                                 onCardDragEnded: _clearHoveredMeld,
 
                                 onCardDropped: (draggedCards, position) {
+                if (widget.game.currentPlayerIndex != 0) {
+                  return;
+                }
                 final handIndexes = <int>[];
 
                 for (final draggedCard in draggedCards) {
@@ -771,51 +776,13 @@ class _GameScreenState extends State<GameScreen> {
                   top: 0,
               child: SizedBox(
                 width: controlReserve,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ElevatedButton(
-                      key: const ValueKey('sort-suit-button'),
-                      style: controlStyle,
-                      onPressed: _sortBySuit,
-                      child: Text(sortSuitLabel),
-                    ),
-                    const SizedBox(height: 2),
-                    ElevatedButton(
-                      key: const ValueKey('sort-rank-button'),
-                      style: controlStyle,
-                      onPressed: _sortByRank,
-                      child: Text(sortRankLabel),
-                    ),
-                    const SizedBox(height: 2),
-                    ElevatedButton(
-                      key: const ValueKey('clear-hand-button'),
-                      style: controlStyle,
-                      onPressed: selectedCardIndexes.isEmpty
-                          ? null
-                          : () {
-                              setState(() {
-                                selectedCardIndexes.clear();
-                              });
-                            },
-                      child: Text(displayedClearLabel),
-                    ),
-                    const SizedBox(height: 2),
-                    ElevatedButton(
-                      key: const ValueKey('undo-button'),
-                      style: controlStyle,
-                      onPressed: gameService.canUndo ? _undo : null,
-                      child: compactControls
-                          ? const Tooltip(
-                              message: 'Undo',
-                              child: Icon(Icons.undo),
-                            )
-                          : const Text('Undo'),
-                    ),
-                  ],
-                  ),
+                child: _buildHumanControls(
+                  geometry,
+                  controlReserve,
+                  availableHeight: geometry.cardHeight,
                 ),
                 ),
+              ),
               ],
               ),
             ),
@@ -827,6 +794,453 @@ class _GameScreenState extends State<GameScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildThreePlayerBoard(BoxConstraints constraints) {
+    final presentation = BoardPresentationGeometry.fromConstraints(
+      width: constraints.maxWidth,
+      height: constraints.maxHeight,
+      opponentLongestMeld: widget.game.players
+          .skip(1)
+          .expand((player) => player.melds)
+          .map((meld) => meld.cards.length)
+          .fold(0, (max, count) => count > max ? count : max),
+      humanLongestMeld: widget.game.players.first.melds
+          .map((meld) => meld.cards.length)
+          .fold(0, (max, count) => count > max ? count : max),
+    );
+    final controlReserve = _humanControlReserve(
+      boardWidth: constraints.maxWidth,
+      handLength: widget.game.players.first.hand.length,
+      geometry: presentation.humanHand,
+    );
+    final board = MultiplayerBoardGeometry.fromSize(
+      size: Size(constraints.maxWidth, constraints.maxHeight),
+      playerCount: 3,
+      humanControlsWidth: controlReserve,
+      humanHandHeight: presentation.humanHand.cardHeight,
+    );
+    final human = widget.game.players[0];
+    final right = widget.game.players[1];
+    final top = widget.game.players[2];
+
+    Widget meldArea({
+      required String keyName,
+      required List<Meld> melds,
+      required Rect region,
+      GlobalKey? areaKey,
+      List<GlobalKey>? meldKeys,
+      List<List<GlobalKey>>? meldCardKeys,
+      bool interactive = false,
+    }) {
+      return Positioned.fromRect(
+        rect: region,
+        child: LayoutBuilder(
+          builder: (context, regionConstraints) => MeldAreaWidget(
+            key: ValueKey(keyName),
+            areaKey: areaKey,
+            meldKeys: meldKeys,
+            meldCardKeys: meldCardKeys,
+            melds: melds,
+            emptyText: interactive ? 'MELDS' : '',
+            orientation: meldOrientation,
+            geometry: presentation.table,
+            availableHeight: regionConstraints.maxHeight,
+            availableWidth: regionConstraints.maxWidth,
+            maxCardWidth: meldOrientation == MeldOrientation.vertical
+                ? presentation.table.cardWidth
+                : null,
+            hoveredMeldIndex: interactive ? hoveredMeldIndex : null,
+            hoveredMeldBefore: interactive ? hoveredMeldBefore : null,
+            newMeldInsertionIndex: interactive ? newMeldInsertionIndex : null,
+            newMeldInsertionRow: interactive ? newMeldInsertionRow : null,
+            onMeldTapped: interactive
+                ? (index, position) => _handleHumanMeldTap(index, position)
+                : null,
+            onAreaTapped: interactive ? _handleHumanAreaTap : null,
+          ),
+        ),
+      );
+    }
+
+    final turnLabel = widget.game.currentPlayerIndex == 0
+        ? 'YOUR TURN'
+        : '${widget.game.currentPlayer.name.toUpperCase()} TURN';
+
+    return Container(
+      key: const ValueKey('table-surface'),
+      color: _tableSurfaceColor(),
+      child: Stack(
+        key: const ValueKey('three-player-board'),
+        clipBehavior: Clip.none,
+        children: [
+        meldArea(
+          keyName: 'top-meld-area',
+          melds: top.melds,
+          region: board.topMeldRegion,
+        ),
+        meldArea(
+          keyName: 'right-meld-area',
+          melds: right.melds,
+          region: board.rightMeldRegion,
+        ),
+        meldArea(
+          keyName: 'human-meld-area',
+          melds: human.melds,
+          region: board.humanMeldRegion,
+          areaKey: playerMeldAreaKey,
+          meldKeys: playerMeldKeys,
+          meldCardKeys: playerMeldCardKeys,
+          interactive: true,
+        ),
+        Positioned(
+          left: board.statusRegionFor(PlayerSeat.top)!.left,
+          top: board.statusRegionFor(PlayerSeat.top)!.top,
+          child: CompactAiStatus(
+            key: const ValueKey('ai-2-status'),
+            playerName: 'AI 2',
+            cardCount: top.hand.length,
+          ),
+        ),
+        Positioned(
+          left: board.statusRegionFor(PlayerSeat.right)!.left,
+          top: board.statusRegionFor(PlayerSeat.right)!.top,
+          child: CompactAiStatus(
+            key: const ValueKey('ai-1-status'),
+            playerName: 'AI 1',
+            cardCount: right.hand.length,
+          ),
+        ),
+        Positioned(
+          right: 4,
+          top: 4,
+          child: _buildOptionsMenu(),
+        ),
+        Positioned.fromRect(
+          rect: board.humanHandRegion,
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: _buildThreePlayerHumanHand(
+              player: human,
+              geometry: presentation.humanHand,
+              availableWidth: board.humanHandRegion.width,
+            ),
+          ),
+        ),
+        Positioned.fromRect(
+          rect: board.humanControlsRegion,
+          child: _buildHumanControls(
+            presentation.humanHand,
+            board.humanControlsRegion.width,
+            availableHeight: board.humanControlsRegion.height,
+          ),
+        ),
+        Positioned.fromRect(
+          rect: board.pilesRegion,
+          child: LayoutBuilder(
+            builder: (context, pileConstraints) {
+              const indicatorHeight = 18.0;
+              const drawDiscardGap = 6.0;
+              const indicatorGap = 4.0;
+              final widthLimit = (pileConstraints.maxWidth - 8)
+                  .clamp(1.0, CardGeometry.maxCardWidth)
+                  .toDouble();
+              final heightLimit = ((pileConstraints.maxHeight -
+                          indicatorHeight -
+                          indicatorGap -
+                          drawDiscardGap) /
+                      2 /
+                      CardGeometry.cardAspectRatio)
+                  .clamp(1.0, CardGeometry.maxCardWidth)
+                  .toDouble();
+              final compactPileGeometry = CardGeometry.fromWidth(
+                widthLimit < heightLimit ? widthLimit : heightLimit,
+                allowBelowMinimum: true,
+              );
+              return Center(
+                child: Column(
+                  key: const ValueKey('three-player-piles'),
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      height: indicatorHeight,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          turnLabel,
+                          key: const ValueKey('turn-indicator'),
+                          maxLines: 1,
+                          softWrap: false,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: indicatorGap),
+                    _buildDrawPile(compactPileGeometry),
+                    const SizedBox(height: drawDiscardGap),
+                    _buildDiscardPile(compactPileGeometry),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildThreePlayerHumanHand({
+    required Player player,
+    required CardGeometry geometry,
+    required double availableWidth,
+  }) {
+    return PlayerHandWidget(
+      key: const ValueKey('human-hand-group'),
+      hand: player.hand,
+      selectedIndexes: selectedCardIndexes,
+      geometry: geometry,
+      availableWidth: availableWidth,
+      onCardTapped: (index) {
+        if (widget.game.currentPlayerIndex != 0) return;
+        setState(() {
+          if (!selectedCardIndexes.add(index)) {
+            selectedCardIndexes.remove(index);
+          }
+        });
+      },
+      onSelectionChanged: (selection) {
+        setState(() {
+          selectedCardIndexes
+            ..clear()
+            ..addAll(selection);
+        });
+      },
+      onCardDragStarted: (indexes) => _activeDragHandIndexes = indexes,
+      onCardDragUpdated: _updateHoveredMeld,
+      onCardDragEnded: _clearHoveredMeld,
+      onCardDropped: _handleHumanCardDropped,
+    );
+  }
+
+  Widget _buildHumanControls(
+    CardGeometry geometry,
+    double width,
+    {double? availableHeight,
+  }) {
+    final compactControls = width < 50;
+    final narrowControls = !compactControls && width < 80;
+    final sortSuitLabel = compactControls
+        ? '\u2663'
+        : narrowControls
+            ? 'Suit'
+            : 'Sort Suit';
+    final sortRankLabel = compactControls
+        ? '\u2195'
+        : narrowControls
+            ? 'Rank'
+            : 'Sort Rank';
+    final clearLabel = compactControls ? '\u00D7' : 'Clear';
+    const interButtonGap = 1.0;
+    final controlHeight = availableHeight == null
+        ? 26.0
+        : ((availableHeight - interButtonGap * 3) / 4)
+            .clamp(1.0, 28.0)
+            .toDouble();
+    final controlStyle = ElevatedButton.styleFrom(
+      minimumSize: Size.zero,
+      fixedSize: Size(width, controlHeight),
+      maximumSize: Size(width, controlHeight),
+      padding: EdgeInsets.zero,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+    );
+    return Padding(
+      key: const ValueKey('human-controls-group'),
+      padding: EdgeInsets.zero,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ElevatedButton(
+            key: const ValueKey('sort-suit-button'),
+            style: controlStyle,
+            onPressed: _sortBySuit,
+            child: Text(sortSuitLabel),
+          ),
+          const SizedBox(height: interButtonGap),
+          ElevatedButton(
+            key: const ValueKey('sort-rank-button'),
+            style: controlStyle,
+            onPressed: _sortByRank,
+            child: Text(sortRankLabel),
+          ),
+          const SizedBox(height: interButtonGap),
+          ElevatedButton(
+            key: const ValueKey('clear-hand-button'),
+            style: controlStyle,
+            onPressed: selectedCardIndexes.isEmpty
+                ? null
+                : () {
+                    setState(selectedCardIndexes.clear);
+                  },
+            child: Text(clearLabel),
+          ),
+          const SizedBox(height: interButtonGap),
+          ElevatedButton(
+            key: const ValueKey('undo-button'),
+            style: controlStyle,
+            onPressed: gameService.canUndo ? _undo : null,
+            child: compactControls
+                ? const Tooltip(
+                    message: 'Undo',
+                    child: Icon(Icons.undo),
+                  )
+                : const Text('Undo'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleHumanMeldTap(int meldIndex, Offset position) {
+    if (widget.game.currentPlayerIndex != 0 || selectedCardIndexes.isEmpty) {
+      return;
+    }
+    final result = gameService.resolveAddCardsToMeld(
+      meldIndex,
+      selectedCardIndexes.toList(),
+    );
+    if (result == null || !result.isValid) {
+      _showMeldRejection();
+      return;
+    }
+    MeldAdditionAlternative? alternative;
+    if (result.isUnique) {
+      alternative = result.alternatives.single;
+    } else {
+      final rect = DragDropService.getGlobalRect(playerMeldKeys[meldIndex]);
+      if (rect != null) {
+        alternative = gameService.selectMeldAdditionAlternative(
+          meldIndex,
+          result,
+          meldOrientation.isBefore(position, rect),
+        );
+      }
+    }
+    if (alternative == null) {
+      _showMeldRejection();
+      return;
+    }
+    var success = false;
+    setState(() {
+      success = gameService.applyMeldAddition(
+        meldIndex,
+        selectedCardIndexes.toList(),
+        alternative!,
+      );
+      if (success) selectedCardIndexes.clear();
+    });
+    if (!success) _showMeldRejection();
+  }
+
+  void _handleHumanAreaTap(Offset position) {
+    if (widget.game.currentPlayerIndex != 0 || selectedCardIndexes.isEmpty) {
+      return;
+    }
+    final insertionIndex =
+        _horizontalMeldInsertionTarget(position)?.insertionIndex ??
+        _newMeldIndexForPosition(position);
+    var success = false;
+    MeldArrangementStatus? failureStatus;
+    setState(() {
+      final result = gameService.createMeldResult(
+        selectedCardIndexes.toList(),
+        insertionIndex: insertionIndex,
+      );
+      success = result.success;
+      failureStatus = result.status;
+      if (success) selectedCardIndexes.clear();
+    });
+    if (!success) _showMeldRejection(status: failureStatus);
+  }
+
+  void _handleHumanCardDropped(List<CardModel> draggedCards, Offset position) {
+    if (widget.game.currentPlayerIndex != 0) return;
+    final handIndexes = <int>[];
+    for (final card in draggedCards) {
+      final index = widget.game.players.first.hand.indexWhere(
+        (candidate) => candidate.id == card.id,
+      );
+      if (index == -1) return;
+      handIndexes.add(index);
+    }
+    final result = DragDropService.findDropTarget(
+      position: position,
+      discardPileKey: discardPileKey,
+      meldAreaKey: playerMeldAreaKey,
+      meldKeys: playerMeldKeys,
+      meldCardKeys: playerMeldCardKeys,
+    );
+    if (result.type == DropTargetType.discardPile) {
+      setState(() {
+        if (draggedCards.length == 1 &&
+            widget.game.canDiscard() &&
+            gameService.discardCard(draggedCards.first)) {
+          selectedCardIndexes.clear();
+        }
+      });
+      if (widget.game.currentPlayerIndex != 0) _playAiTurn();
+      return;
+    }
+    if (result.type == DropTargetType.existingMeld) {
+      final meldIndex = result.meldIndex!;
+      final resolution = gameService.resolveAddCardsToMeld(meldIndex, handIndexes);
+      if (resolution == null || !resolution.isValid) {
+        _showMeldRejection();
+        return;
+      }
+      MeldAdditionAlternative? alternative;
+      if (resolution.isUnique) {
+        alternative = resolution.alternatives.single;
+      } else {
+        final rect = DragDropService.getGlobalRect(playerMeldKeys[meldIndex]);
+        if (rect != null) {
+          alternative = gameService.selectMeldAdditionAlternative(
+            meldIndex,
+            resolution,
+            meldOrientation.isBefore(position, rect),
+          );
+        }
+      }
+      if (alternative == null) {
+        _showMeldRejection();
+        return;
+      }
+      var success = false;
+      setState(() {
+        success = gameService.applyMeldAddition(meldIndex, handIndexes, alternative!);
+        if (success) selectedCardIndexes.clear();
+      });
+      if (!success) _showMeldRejection();
+      return;
+    }
+    if (result.type == DropTargetType.meldArea) {
+      final insertionIndex =
+          _horizontalMeldInsertionTarget(position)?.insertionIndex ??
+          _newMeldIndexForPosition(position);
+      var success = false;
+      MeldArrangementStatus? failureStatus;
+      setState(() {
+        final creation = gameService.createMeldResult(
+          handIndexes,
+          insertionIndex: insertionIndex,
+        );
+        success = creation.success;
+        failureStatus = creation.status;
+        if (success) selectedCardIndexes.clear();
+      });
+      if (!success) _showMeldRejection(status: failureStatus);
+    }
   }
 
   int _newMeldIndexForPosition(Offset position) {
@@ -949,14 +1363,24 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _playAiTurn() {
+    if (widget.game.currentPlayerIndex == 0) return;
     final generation = _aiGeneration;
+    final expectedPlayerIndex = widget.game.currentPlayerIndex;
     Future.delayed(const Duration(seconds: 1), () {
-      if (!mounted || generation != _aiGeneration) return;
+      if (!mounted ||
+          generation != _aiGeneration ||
+          widget.game.currentPlayerIndex != expectedPlayerIndex ||
+          widget.game.currentPlayerIndex == 0) {
+        return;
+      }
 
       setState(() {
         aiService.playTurn();
       });
       _persistGame();
+      if (widget.game.currentPlayerIndex != 0) {
+        _playAiTurn();
+      }
     });
   }
 }
