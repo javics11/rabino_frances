@@ -1538,6 +1538,9 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Widget _buildDrawPile(CardGeometry geometry) {
+    final topCard = widget.game.deck.cards.isEmpty
+        ? null
+        : widget.game.deck.cards.last;
     return GestureDetector(
       onTap: widget.game.currentPlayerIndex != 0 || !widget.game.canDraw()
           ? null
@@ -1551,7 +1554,11 @@ class _GameScreenState extends State<GameScreen> {
         width: geometry.cardFootprintWidth,
         height: geometry.cardHeight,
         decoration: BoxDecoration(
-          color: widget.game.canDraw() ? Colors.blue : Colors.grey,
+          color: topCard == null
+              ? Colors.grey
+              : topCard.deck == CardDeck.red
+                  ? Colors.red
+                  : Colors.blue,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Center(

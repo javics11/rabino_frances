@@ -1,17 +1,21 @@
 import 'spanish_suit.dart';
 
+enum CardDeck { red, blue }
+
 class CardModel {
   final int id;
 
   final SpanishSuit? suit;
   final int? rank;
   final bool isJoker;
+  final CardDeck deck;
 
   const CardModel({
     required this.id,
     this.suit,
     this.rank,
     this.isJoker = false,
+    this.deck = CardDeck.red,
   });
 
   String get shortSuit {

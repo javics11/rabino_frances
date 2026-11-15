@@ -133,6 +133,19 @@ class CardWidget extends StatelessWidget {
                     ],
                   ),
           ),
+          Positioned(
+            left: 5,
+            bottom: 5,
+            child: Container(
+              key: ValueKey('card-deck-mark-${card.deck.name}'),
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: card.deck == CardDeck.red ? Colors.red : Colors.blue,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
         ],
       ),
     );

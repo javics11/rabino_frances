@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rabino_frances/models/card.dart';
@@ -10,6 +12,69 @@ import 'package:rabino_frances/services/game_persistence.dart';
 import 'package:rabino_frances/services/game_factory.dart';
 
 void main() {
+  test('legacy schema-v1 cards reconstruct physical deck identity', () async {
+    SharedPreferences.setMockInitialValues({
+      'unfinished_game_v1': jsonEncode({
+        'version': 1,
+        'deck': [
+          {'id': 0, 'rank': 1, 'suit': 'oros', 'isJoker': false},
+          {'id': 52, 'rank': 1, 'suit': 'oros', 'isJoker': false},
+          {'id': 104, 'rank': null, 'suit': null, 'isJoker': true},
+          {'id': 106, 'rank': null, 'suit': null, 'isJoker': true},
+        ],
+        'players': [
+          {
+            'name': 'You',
+            'hasOpened': false,
+            'hand': [],
+            'melds': [],
+          },
+          {
+            'name': 'Evaristo',
+            'hasOpened': false,
+            'hand': [],
+            'melds': [],
+          },
+        ],
+        'discardPile': [],
+        'currentPlayerIndex': 0,
+        'firstTurnOfRound': true,
+        'hasDrawnThisTurn': false,
+      }),
+    });
+
+    final game = await const SharedPreferencesGamePersistence().loadGame();
+    expect(game, isNotNull);
+    expect(game!.deck.cards[0].deck, CardDeck.red);
+    expect(game.deck.cards[1].deck, CardDeck.blue);
+    expect(game.deck.cards[2].deck, CardDeck.red);
+    expect(game.deck.cards[3].deck, CardDeck.blue);
+    expect(game.deck.cards[2].isJoker, isTrue);
+    expect(game.deck.cards[3].isJoker, isTrue);
+    expect(game.deck.cards[2].rank, isNull);
+    expect(game.deck.cards[3].rank, isNull);
+    expect(game.deck.cards[2].suit, isNull);
+    expect(game.deck.cards[3].suit, isNull);
+  });
+
+  test('current persistence preserves explicit red and blue deck identity', () async {
+    SharedPreferences.setMockInitialValues({});
+    final game = Game(deck: Deck()..cards.clear(), players: [Player('You'), Player('Evaristo')]);
+    game.deck.cards.addAll([
+      const CardModel(id: 1, rank: 10, suit: SpanishSuit.oros, deck: CardDeck.red),
+      const CardModel(id: 2, rank: 10, suit: SpanishSuit.oros, deck: CardDeck.blue),
+    ]);
+
+    final persistence = const SharedPreferencesGamePersistence();
+    await persistence.saveGame(game);
+    final restored = await persistence.loadGame();
+
+    expect(restored!.deck.cards.map((card) => card.deck), [
+      CardDeck.red,
+      CardDeck.blue,
+    ]);
+  });
+
   for (final playerCount in [2, 3, 4]) {
     test('SharedPreferences round-trips $playerCount players', () async {
       SharedPreferences.setMockInitialValues({});

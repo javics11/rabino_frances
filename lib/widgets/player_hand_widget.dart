@@ -396,6 +396,7 @@ class _PlayerHandWidgetState extends State<PlayerHandWidget> {
                           : CardBackWidget(
                               key: _cardRenderKey(widget.hand[index].id),
                               geometry: widget.geometry,
+                              deck: widget.hand[index].deck,
                             ),
                           ),
                   ),

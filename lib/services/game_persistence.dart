@@ -99,6 +99,7 @@ Map<String, dynamic> _encodeCard(CardModel card) => {
       'rank': card.rank,
       'suit': card.suit?.name,
       'isJoker': card.isJoker,
+      'deck': card.deck.name,
     };
 
 Game _decodeGame(dynamic value) {
@@ -157,8 +158,19 @@ CardModel _decodeCard(dynamic value) {
     rank: map['rank'] as int?,
     suit: _suit(map['suit']),
     isJoker: _bool(map['isJoker']),
+    deck: _decodeDeck(map['deck'], _legacyDeckForId(_int(map['id']))),
   );
 }
+
+CardDeck _decodeDeck(dynamic value, CardDeck fallback) => value is String
+    ? CardDeck.values.byName(value)
+    : fallback;
+
+// Schema-v1 cards predate the explicit field. Their stable Deck IDs were
+// allocated as red naturals 0-51, blue naturals 52-103, then red Jokers
+// 104-105 and blue Jokers 106-107.
+CardDeck _legacyDeckForId(int id) =>
+    (id >= 52 && id <= 103) || id >= 106 ? CardDeck.blue : CardDeck.red;
 
 SpanishSuit? _suit(dynamic value) => value == null
     ? null
