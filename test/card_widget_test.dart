@@ -123,4 +123,38 @@ void main() {
     );
     expect(smallCornerRank.style!.fontSize, largeCornerRank.style!.fontSize);
   });
+
+  testWidgets('small table cards keep normal, face and Joker corners contained', (
+    tester,
+  ) async {
+    final smallGeometry = CardGeometry.fromWidth(
+      40,
+      allowBelowMinimum: true,
+    );
+    const ten = CardModel(id: 5, rank: 10, suit: SpanishSuit.bastos);
+    await tester.pumpWidget(
+      _configuredCard(ten, smallGeometry, CardCornerLayout.horizontal),
+    );
+    expect(tester.takeException(), isNull);
+    expect(find.byType(CardWidget), findsOneWidget);
+
+    await tester.pumpWidget(
+      _configuredCard(
+        const CardModel(id: 6, rank: 7, suit: SpanishSuit.bastos),
+        smallGeometry,
+        CardCornerLayout.vertical,
+      ),
+    );
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(
+      _configuredCard(
+        const CardModel(id: 7, isJoker: true),
+        smallGeometry,
+        CardCornerLayout.horizontal,
+      ),
+    );
+    expect(tester.takeException(), isNull);
+    expect(find.byType(CardWidget), findsOneWidget);
+  });
 }

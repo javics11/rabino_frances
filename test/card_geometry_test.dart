@@ -116,4 +116,29 @@ void main() {
 
     expect(geometry.cardWidth, lessThanOrEqualTo(64));
   });
+
+  test('meld-area geometry supports an opt-in below-minimum cap', () {
+    final geometry = CardGeometry.forMeldArea(
+      availableWidth: 390,
+      availableHeight: 80,
+      longestMeld: 3,
+      maxCardWidth: 40,
+      allowBelowMinimum: true,
+    );
+
+    expect(geometry.cardWidth, greaterThan(0));
+    expect(geometry.cardWidth, lessThanOrEqualTo(40));
+    expect(geometry.cardHeight, closeTo(geometry.cardWidth * 1.5, 0.001));
+  });
+
+  test('meld-area geometry keeps the normal minimum at the boundary', () {
+    final geometry = CardGeometry.forMeldArea(
+      availableWidth: 390,
+      availableHeight: 80,
+      longestMeld: 3,
+      maxCardWidth: CardGeometry.minCardWidth,
+    );
+
+    expect(geometry.cardWidth, CardGeometry.minCardWidth);
+  });
 }

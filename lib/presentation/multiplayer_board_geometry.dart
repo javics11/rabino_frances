@@ -4,6 +4,8 @@ import 'player_seat.dart';
 
 /// Presentation geometry for the 3- and 4-player meld territories.
 class MultiplayerBoardGeometry {
+  static const fourPlayerHorizontalMeldHeightBias = 1.08;
+
   final Size size;
   final Rect humanHandRegion;
   final Rect humanControlsRegion;
@@ -68,11 +70,22 @@ class MultiplayerBoardGeometry {
       actualControlsWidth,
       actualHumanHandHeight,
     );
+    final pilesWidth = playerCount == 3
+        ? (size.width * .25).clamp(76.0, 110.0).toDouble()
+        : (size.width * .18).clamp(96.0, 140.0).toDouble();
     final maximumMeldBandHeight =
         (humanControlsRegion.top - size.height * .08) / 2;
-    final meldBandHeight = (size.height * .24)
-        .clamp(120.0, maximumMeldBandHeight)
-        .toDouble();
+    final fourPlayerSideWidth = (size.width - pilesWidth) / 2;
+    final equalAreaMeldBandHeight = fourPlayerSideWidth *
+        humanControlsRegion.top /
+        (size.width + 2 * fourPlayerSideWidth);
+    final meldBandHeight = playerCount == 4
+        ? (equalAreaMeldBandHeight * fourPlayerHorizontalMeldHeightBias)
+            .clamp(96.0, maximumMeldBandHeight)
+            .toDouble()
+        : (size.height * .24)
+            .clamp(120.0, maximumMeldBandHeight)
+            .toDouble();
     final topHeight = meldBandHeight;
     final topMeldRegion = Rect.fromLTWH(0, 0, size.width, topHeight);
     final humanMeldRegion = Rect.fromLTWH(
@@ -84,10 +97,7 @@ class MultiplayerBoardGeometry {
     final middleTop = topMeldRegion.bottom;
     final middleBottom = humanMeldRegion.top;
     final middleHeight = middleBottom - middleTop;
-    final sideWidth = (size.width * .22).clamp(68.0, 96.0).toDouble();
-    final pilesWidth = playerCount == 3
-        ? (size.width * .25).clamp(76.0, 110.0).toDouble()
-        : (size.width * .42).clamp(120.0, 180.0).toDouble();
+    final sideWidth = (size.width - pilesWidth) / 2;
 
     final Rect pilesRegion;
     final Rect rightMeldRegion;
@@ -118,12 +128,12 @@ class MultiplayerBoardGeometry {
 
     final statusHeight = (middleHeight * .28).clamp(24.0, 42.0).toDouble();
     final statusWidth =
-        (playerCount == 3 ? rightMeldRegion.width : sideWidth - 8)
+        (playerCount == 3 ? rightMeldRegion.width : rightMeldRegion.width - 8)
             .clamp(40.0, 116.0)
         .toDouble();
     final statusRegions = <PlayerSeat, Rect>{
       PlayerSeat.top: Rect.fromLTWH(
-        size.width - statusWidth - 6,
+        playerCount == 4 ? 6 : size.width - statusWidth - 6,
         topMeldRegion.top + 6,
         statusWidth,
         statusHeight,

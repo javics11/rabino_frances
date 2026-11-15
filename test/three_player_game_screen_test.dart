@@ -35,6 +35,36 @@ Game _threePlayerGame({int humanCardCount = 1}) {
   return Game(deck: Deck(), players: players);
 }
 
+Game _fourPlayerGame({bool includeHumanMeld = true}) {
+  final players = [
+    Player('You'),
+    Player('AI 1'),
+    Player('AI 2'),
+    Player('AI 3'),
+  ];
+  players[0].hand.add(_card(10, 1));
+  for (var playerIndex = 1; playerIndex < players.length; playerIndex++) {
+    players[playerIndex].hand.addAll([
+      _card(playerIndex * 10, 1),
+      _card(playerIndex * 10 + 1, 2),
+      _card(playerIndex * 10 + 2, 3),
+    ]);
+    players[playerIndex].melds.add(
+      Meld(cards: [
+        _card(playerIndex * 100, 4),
+        _card(playerIndex * 100 + 1, 5),
+        _card(playerIndex * 100 + 2, 6),
+      ]),
+    );
+  }
+  if (includeHumanMeld) {
+    players[0].melds.add(
+      Meld(cards: [_card(1000, 7), _card(1001, 8), _card(1002, 9)]),
+    );
+  }
+  return Game(deck: Deck(), players: players);
+}
+
 Future<void> _pumpThreePlayerBoard(
   WidgetTester tester, {
   Size size = const Size(360, 640),
@@ -54,7 +84,193 @@ Future<void> _pumpThreePlayerBoard(
   await tester.pump();
 }
 
+Future<void> _pumpFourPlayerBoard(
+  WidgetTester tester, {
+  Size size = const Size(360, 640),
+  MeldOrientation orientation = MeldOrientation.vertical,
+  bool includeHumanMeld = true,
+}) async {
+  await tester.binding.setSurfaceSize(size);
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+  await tester.pumpWidget(
+    MaterialApp(
+      home: GameScreen(
+        game: _fourPlayerGame(includeHumanMeld: includeHumanMeld),
+        initialMeldOrientation: orientation,
+      ),
+    ),
+  );
+  await tester.pump();
+}
+
 void main() {
+  testWidgets('four-player board renders all seats, melds, and centred piles', (
+    tester,
+  ) async {
+    await _pumpFourPlayerBoard(tester);
+
+    expect(find.byKey(const ValueKey('four-player-board')), findsOneWidget);
+    expect(find.byType(CompactAiStatus), findsNWidgets(3));
+    expect(find.text('AI 1'), findsOneWidget);
+    expect(find.text('AI 2'), findsOneWidget);
+    expect(find.text('AI 3'), findsOneWidget);
+    expect(find.byKey(const ValueKey('left-meld-area')), findsOneWidget);
+    expect(find.byKey(const ValueKey('right-meld-area')), findsOneWidget);
+    expect(find.byKey(const ValueKey('top-meld-area')), findsOneWidget);
+    expect(find.byKey(const ValueKey('human-meld-area')), findsOneWidget);
+    expect(find.byKey(const ValueKey('four-player-piles')), findsOneWidget);
+    expect(find.byType(CardBackWidget), findsNothing);
+
+    final statuses = tester.widgetList<CompactAiStatus>(find.byType(CompactAiStatus));
+    expect(
+      statuses.map((status) => '${status.playerName}:${status.cardCount}'),
+      containsAll(<String>['AI 1:3', 'AI 2:3', 'AI 3:3']),
+    );
+    expect(find.byKey(const ValueKey('human-hand-group')), findsOneWidget);
+    expect(find.byKey(const ValueKey('sort-suit-button')), findsOneWidget);
+    final ai2 = tester.getRect(find.byKey(const ValueKey('ai-2-status')));
+    final options = tester.getRect(find.byKey(const ValueKey('options-menu')));
+    expect(ai2.left, lessThan(options.left));
+  });
+
+  for (final size in [
+    const Size(360, 640),
+    const Size(320, 568),
+    const Size(1200, 800),
+  ]) {
+    testWidgets('four-player board stays usable at $size', (tester) async {
+      await _pumpFourPlayerBoard(tester, size: size);
+      expect(tester.takeException(), isNull);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('four-player-piles')),
+          matching: find.byType(GestureDetector),
+        ),
+        findsNWidgets(2),
+      );
+      final board = tester.getRect(find.byKey(const ValueKey('four-player-board')));
+      for (final key in [
+        'human-hand-group',
+        'human-controls-group',
+        'ai-1-status',
+        'ai-2-status',
+        'ai-3-status',
+        'four-player-piles',
+      ]) {
+        final rect = tester.getRect(find.byKey(ValueKey(key)));
+        expect(rect.left, greaterThanOrEqualTo(board.left));
+        expect(rect.top, greaterThanOrEqualTo(board.top));
+        expect(rect.right, lessThanOrEqualTo(board.right));
+        expect(rect.bottom, lessThanOrEqualTo(board.bottom));
+      }
+    });
+  }
+
+  testWidgets('four-player orientation propagates to all meld areas', (tester) async {
+    await _pumpFourPlayerBoard(tester);
+    expect(
+      tester.widgetList<MeldAreaWidget>(find.byType(MeldAreaWidget)).every(
+            (area) => area.orientation == MeldOrientation.vertical,
+          ),
+      isTrue,
+    );
+    await tester.tap(find.byKey(const ValueKey('options-menu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Horizontal'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widgetList<MeldAreaWidget>(find.byType(MeldAreaWidget)).every(
+            (area) => area.orientation == MeldOrientation.horizontal,
+          ),
+      isTrue,
+    );
+  });
+
+  testWidgets('four-player table cards scale together at short height', (tester) async {
+    await _pumpFourPlayerBoard(
+      tester,
+      size: const Size(490, 700),
+      includeHumanMeld: true,
+    );
+    final normalHumanMeldArea = tester.widget<MeldAreaWidget>(
+      find.byKey(const ValueKey('human-meld-area')),
+    );
+    final normalMeldWidth = normalHumanMeldArea.geometry.cardWidth;
+    final normalMeldHeight = tester
+        .getRect(find.byKey(const ValueKey('human-meld-area')))
+        .height;
+    final normalHandWidth = tester
+        .widget<PlayerHandWidget>(find.byKey(const ValueKey('human-hand-group')))
+        .geometry
+        .cardWidth;
+    void expectAllMeldWidths(double expected) {
+      expect(
+        [
+          'human-meld-area',
+          'top-meld-area',
+          'left-meld-area',
+          'right-meld-area',
+        ].map(
+          (key) => tester
+              .widget<MeldAreaWidget>(find.byKey(ValueKey(key)))
+              .geometry
+              .cardWidth,
+        ),
+        everyElement(closeTo(expected, 0.001)),
+      );
+    }
+    expectAllMeldWidths(normalMeldWidth);
+
+    await _pumpFourPlayerBoard(
+      tester,
+      size: const Size(490, 550),
+      includeHumanMeld: true,
+    );
+    final moderateHumanMeldArea = tester.widget<MeldAreaWidget>(
+      find.byKey(const ValueKey('human-meld-area')),
+    );
+    final moderateMeldWidth = moderateHumanMeldArea.geometry.cardWidth;
+    final moderateMeldHeight = tester
+        .getRect(find.byKey(const ValueKey('human-meld-area')))
+        .height;
+    final moderateHandWidth = tester
+        .widget<PlayerHandWidget>(find.byKey(const ValueKey('human-hand-group')))
+        .geometry
+        .cardWidth;
+    expectAllMeldWidths(moderateMeldWidth);
+    expect(moderateMeldWidth, lessThan(normalMeldWidth));
+    expect(moderateMeldHeight, lessThan(normalMeldHeight));
+    expect(moderateHandWidth, closeTo(normalHandWidth, 0.001));
+
+    await _pumpFourPlayerBoard(
+      tester,
+      size: const Size(490, 525),
+      includeHumanMeld: true,
+    );
+    final shortHumanMeldArea = tester.widget<MeldAreaWidget>(
+      find.byKey(const ValueKey('human-meld-area')),
+    );
+    final shortMeldWidth = shortHumanMeldArea.geometry.cardWidth;
+    final shortMeldHeight = tester
+        .getRect(find.byKey(const ValueKey('human-meld-area')))
+        .height;
+    final shortHandWidth = tester
+        .widget<PlayerHandWidget>(find.byKey(const ValueKey('human-hand-group')))
+        .geometry
+        .cardWidth;
+
+    expect(shortMeldWidth, lessThanOrEqualTo(moderateMeldWidth));
+    expect(shortMeldHeight, lessThanOrEqualTo(moderateMeldHeight));
+    expect(shortHandWidth, lessThan(moderateHandWidth));
+    expectAllMeldWidths(shortMeldWidth);
+    expect(
+      tester.getRect(find.byKey(const ValueKey('human-hand-group'))).top,
+      greaterThanOrEqualTo(
+        tester.getRect(find.byKey(const ValueKey('human-meld-area'))).bottom,
+      ),
+    );
+  });
+
   testWidgets('three-player board renders each seat and owned melds', (tester) async {
     await _pumpThreePlayerBoard(tester);
 
@@ -212,7 +428,13 @@ void main() {
     await _pumpThreePlayerBoard(tester, size: const Size(320, 568));
     expect(tester.takeException(), isNull);
     expect(find.byKey(const ValueKey('human-hand-group')), findsOneWidget);
-    expect(find.byKey(const ValueKey('draw-pile')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('three-player-piles')),
+        matching: find.byType(GestureDetector),
+      ),
+      findsNWidgets(2),
+    );
     final controls = tester.getRect(
       find.byKey(const ValueKey('human-controls-group')),
     );

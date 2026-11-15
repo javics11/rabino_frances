@@ -29,6 +29,8 @@ class MeldAreaWidget extends StatelessWidget {
   final double? availableHeight;
   final double? availableWidth;
   final double? maxCardWidth;
+  final bool clipContent;
+  final bool lockCardWidth;
 
   const MeldAreaWidget({
     super.key,
@@ -49,6 +51,8 @@ class MeldAreaWidget extends StatelessWidget {
     this.availableHeight,
     this.availableWidth,
     this.maxCardWidth,
+    this.clipContent = false,
+    this.lockCardWidth = false,
   });
 
   @override
@@ -66,12 +70,15 @@ class MeldAreaWidget extends StatelessWidget {
         (areaHeight - topInset * 2 - borderWidth)
         .clamp(0, double.infinity)
         .toDouble();
-    final tableGeometry = orientation == MeldOrientation.vertical
+    final tableGeometry = orientation == MeldOrientation.vertical && !lockCardWidth
         ? CardGeometry.forMeldArea(
             availableWidth: availableWidth ?? double.infinity,
             availableHeight: contentAvailableHeight,
             longestMeld: longestMeld,
             maxCardWidth: maxCardWidth,
+            allowBelowMinimum: maxCardWidth != null &&
+                (maxCardWidth ?? CardGeometry.minCardWidth) <
+                    CardGeometry.minCardWidth,
           )
         : geometry;
     final verticalCardFaceWidth =
@@ -104,6 +111,7 @@ class MeldAreaWidget extends StatelessWidget {
         height: meldHeight,
         width: double.infinity,
         child: Stack(
+          clipBehavior: clipContent ? Clip.hardEdge : Clip.none,
           children: [
             // Background of the meld area
             Positioned.fill(

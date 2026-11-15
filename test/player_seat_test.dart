@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rabino_frances/presentation/multiplayer_board_geometry.dart';
@@ -91,6 +92,90 @@ void main() {
     expect(geometry.topMeldRegion.height, closeTo(geometry.humanMeldRegion.height, 0.001));
     expect(geometry.humanMeldRegion.bottom, lessThanOrEqualTo(geometry.humanControlsRegion.top));
     expect(geometry.humanControlsRegion.top, closeTo(geometry.humanHandRegion.top, 0.001));
+  });
+
+  test('four-player side territories are symmetric around the centre', () {
+    final geometry = MultiplayerBoardGeometry.fromSize(
+      size: const Size(1200, 800),
+      playerCount: 4,
+    );
+    final left = geometry.leftMeldRegion!;
+    final right = geometry.rightMeldRegion;
+    final centre = geometry.pilesRegion;
+
+    expect(left.width, closeTo(right.width, 0.001));
+    expect(left.left, closeTo(0, 0.001));
+    expect(right.right, closeTo(1200, 0.001));
+    expect(left.right, closeTo(centre.left, 0.001));
+    expect(centre.right, closeTo(right.left, 0.001));
+    expect(
+      geometry.statusRegionFor(PlayerSeat.left)!.width,
+      closeTo(geometry.statusRegionFor(PlayerSeat.right)!.width, 0.001),
+    );
+  });
+
+  test('four-player centre remains between all meld territories', () {
+    for (final size in [
+      const Size(360, 640),
+      const Size(320, 568),
+      const Size(1200, 800),
+    ]) {
+      final geometry = MultiplayerBoardGeometry.fromSize(
+        size: size,
+        playerCount: 4,
+      );
+      final left = geometry.leftMeldRegion!;
+      final right = geometry.rightMeldRegion;
+      final centre = geometry.pilesRegion;
+
+      expect(left.right, lessThanOrEqualTo(centre.left));
+      expect(centre.right, lessThanOrEqualTo(right.left));
+      expect(geometry.topMeldRegion.bottom, lessThanOrEqualTo(centre.top));
+      expect(centre.bottom, lessThanOrEqualTo(geometry.humanMeldRegion.top));
+      expect(centre.width, greaterThan(0));
+      expect(centre.height, greaterThan(0));
+    }
+  });
+
+  test('four-player meld territories remain reasonably balanced', () {
+    for (final size in [
+      const Size(360, 640),
+      const Size(320, 568),
+      const Size(1200, 800),
+    ]) {
+      final geometry = MultiplayerBoardGeometry.fromSize(
+        size: size,
+        playerCount: 4,
+      );
+      final areas = [
+        geometry.topMeldRegion.width * geometry.topMeldRegion.height,
+        geometry.rightMeldRegion.width * geometry.rightMeldRegion.height,
+        geometry.humanMeldRegion.width * geometry.humanMeldRegion.height,
+        geometry.leftMeldRegion!.width * geometry.leftMeldRegion!.height,
+      ];
+      expect(areas.reduce(min), greaterThan(0));
+      expect(
+        areas.reduce(max) / areas.reduce(min),
+        lessThanOrEqualTo(1.18),
+      );
+    }
+  });
+
+  test('four-player human region protects supplied card height', () {
+    final geometry = MultiplayerBoardGeometry.fromSize(
+      size: const Size(360, 640),
+      playerCount: 4,
+      humanControlsWidth: 96,
+      humanHandHeight: 92,
+    );
+
+    expect(geometry.humanHandRegion.height, greaterThanOrEqualTo(92));
+    expect(
+      geometry.humanControlsRegion.top,
+      closeTo(geometry.humanHandRegion.top, 0.001),
+    );
+    expect(geometry.humanControlsRegion.right, lessThanOrEqualTo(360));
+    expect(geometry.humanHandRegion.bottom, lessThanOrEqualTo(640));
   });
 
   test('new geometry rejects unsupported player counts', () {

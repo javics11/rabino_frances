@@ -61,18 +61,27 @@ class CardGeometry {
     required double availableHeight,
     required int longestMeld,
     double? maxCardWidth,
+    bool allowBelowMinimum = false,
   }) {
     final areaWidthLimit = availableWidth.isFinite
-        ? (availableWidth * .15).clamp(minCardWidth, CardGeometry.maxCardWidth).toDouble()
+        ? (availableWidth * .15)
+            .clamp(
+              allowBelowMinimum ? 1.0 : minCardWidth,
+              CardGeometry.maxCardWidth,
+            )
+            .toDouble()
         : CardGeometry.maxCardWidth;
     final widthLimit = maxCardWidth == null
         ? areaWidthLimit
-        : areaWidthLimit.clamp(minCardWidth, maxCardWidth).toDouble();
+        : areaWidthLimit
+            .clamp(allowBelowMinimum ? 1.0 : minCardWidth, maxCardWidth)
+            .toDouble();
     final count = longestMeld < 1 ? 1 : longestMeld;
     final fitWidth = availableHeight /
         (cardAspectRatio * (1 + .20 * (count - 1)));
+    final minimumWidth = allowBelowMinimum ? 1.0 : minCardWidth;
     return CardGeometry._(
-      fitWidth.clamp(minCardWidth, widthLimit).toDouble(),
+      fitWidth.clamp(minimumWidth, widthLimit).toDouble(),
     );
   }
 }

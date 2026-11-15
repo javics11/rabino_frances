@@ -43,8 +43,20 @@ class CardWidget extends StatelessWidget {
           Align(
             alignment: Alignment.topLeft,
             child: Padding(
-              padding: const EdgeInsets.only(left: 6, top: 5),
-              child: card.isJoker
+              padding: EdgeInsets.only(
+                left: geometry.cardWidth < CardGeometry.minCardWidth ? 2 : 6,
+                top: geometry.cardWidth < CardGeometry.minCardWidth ? 2 : 5,
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: (geometry.cardWidth - 6)
+                      .clamp(1.0, double.infinity)
+                      .toDouble(),
+                ),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.topLeft,
+                  child: card.isJoker
                   ? const Text(
                       '🃏',
                       key: ValueKey('card-corner-identifier'),
@@ -96,6 +108,8 @@ class CardWidget extends StatelessWidget {
                         ),
                       ],
                     ),
+                ),
+              ),
             ),
           ),
           Center(

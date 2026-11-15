@@ -20,6 +20,7 @@ import '../widgets/hand_layout.dart';
 import '../widgets/board_presentation_geometry.dart';
 import '../presentation/multiplayer_board_geometry.dart';
 import '../presentation/player_seat.dart';
+import '../presentation/four_player_table_geometry.dart';
 
 Color _tableSurfaceColor() => Colors.green.shade200;
 
@@ -318,6 +319,9 @@ class _GameScreenState extends State<GameScreen> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
+          if (widget.game.players.length == 4) {
+            return _buildFourPlayerBoard(constraints);
+          }
           if (widget.game.players.length == 3) {
             return _buildThreePlayerBoard(constraints);
           }
@@ -985,6 +989,209 @@ class _GameScreenState extends State<GameScreen> {
             },
           ),
         ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFourPlayerBoard(BoxConstraints constraints) {
+    final presentation = BoardPresentationGeometry.fromConstraints(
+      width: constraints.maxWidth,
+      height: constraints.maxHeight,
+      opponentLongestMeld: widget.game.players
+          .skip(1)
+          .expand((player) => player.melds)
+          .map((meld) => meld.cards.length)
+          .fold(0, (max, count) => count > max ? count : max),
+      humanLongestMeld: widget.game.players.first.melds
+          .map((meld) => meld.cards.length)
+          .fold(0, (max, count) => count > max ? count : max),
+    );
+    final controlReserve = _humanControlReserve(
+      boardWidth: constraints.maxWidth,
+      handLength: widget.game.players.first.hand.length,
+      geometry: presentation.humanHand,
+    );
+    final board = MultiplayerBoardGeometry.fromSize(
+      size: Size(constraints.maxWidth, constraints.maxHeight),
+      playerCount: 4,
+      humanControlsWidth: controlReserve,
+      humanHandHeight: presentation.humanHand.cardHeight,
+    );
+    final human = widget.game.players[0];
+    final right = widget.game.players[1];
+    final top = widget.game.players[2];
+    final left = widget.game.players[3];
+    final sharedTableGeometry = fourPlayerSharedTableGeometry(
+      tableGeometry: presentation.table,
+      pilesRegion: board.pilesRegion,
+      meldAreaHeight: meldOrientation == MeldOrientation.vertical
+          ? board.humanMeldRegion.height
+          : null,
+      longestMeld: widget.game.players
+          .expand((player) => player.melds)
+          .map((meld) => meld.cards.length)
+          .fold(1, (max, count) => count > max ? count : max),
+    );
+    const pileIndicatorHeight = 18.0;
+    const pileGap = 6.0;
+    const pileIndicatorGap = 4.0;
+
+    // Shared four-player table scale and territory clipping.
+    Widget meldArea({
+      required String keyName,
+      required List<Meld> melds,
+      required Rect region,
+      GlobalKey? areaKey,
+      List<GlobalKey>? meldKeys,
+      List<List<GlobalKey>>? meldCardKeys,
+      bool interactive = false,
+    }) {
+      return Positioned.fromRect(
+        rect: region,
+        child: LayoutBuilder(
+          builder: (context, regionConstraints) => MeldAreaWidget(
+            key: ValueKey(keyName),
+            areaKey: areaKey,
+            meldKeys: meldKeys,
+            meldCardKeys: meldCardKeys,
+            melds: melds,
+            emptyText: interactive ? 'MELDS' : '',
+            orientation: meldOrientation,
+            geometry: sharedTableGeometry,
+            availableHeight: regionConstraints.maxHeight,
+            availableWidth: regionConstraints.maxWidth,
+            maxCardWidth: sharedTableGeometry.cardWidth,
+            clipContent: true,
+            lockCardWidth: true,
+            hoveredMeldIndex: interactive ? hoveredMeldIndex : null,
+            hoveredMeldBefore: interactive ? hoveredMeldBefore : null,
+            newMeldInsertionIndex: interactive ? newMeldInsertionIndex : null,
+            newMeldInsertionRow: interactive ? newMeldInsertionRow : null,
+            onMeldTapped: interactive
+                ? (index, position) => _handleHumanMeldTap(index, position)
+                : null,
+            onAreaTapped: interactive ? _handleHumanAreaTap : null,
+          ),
+        ),
+      );
+    }
+
+    final turnLabel = widget.game.currentPlayerIndex == 0
+        ? 'YOUR TURN'
+        : '${widget.game.currentPlayer.name.toUpperCase()} TURN';
+
+    return Container(
+      key: const ValueKey('table-surface'),
+      color: _tableSurfaceColor(),
+      child: Stack(
+        key: const ValueKey('four-player-board'),
+        clipBehavior: Clip.none,
+        children: [
+          meldArea(
+            keyName: 'top-meld-area',
+            melds: top.melds,
+            region: board.topMeldRegion,
+          ),
+          meldArea(
+            keyName: 'right-meld-area',
+            melds: right.melds,
+            region: board.rightMeldRegion,
+          ),
+          meldArea(
+            keyName: 'left-meld-area',
+            melds: left.melds,
+            region: board.leftMeldRegion!,
+          ),
+          meldArea(
+            keyName: 'human-meld-area',
+            melds: human.melds,
+            region: board.humanMeldRegion,
+            areaKey: playerMeldAreaKey,
+            meldKeys: playerMeldKeys,
+            meldCardKeys: playerMeldCardKeys,
+            interactive: true,
+          ),
+          Positioned.fromRect(
+            rect: board.statusRegionFor(PlayerSeat.top)!,
+            child: CompactAiStatus(
+              key: const ValueKey('ai-2-status'),
+              playerName: 'AI 2',
+              cardCount: top.hand.length,
+            ),
+          ),
+          Positioned.fromRect(
+            rect: board.statusRegionFor(PlayerSeat.right)!,
+            child: CompactAiStatus(
+              key: const ValueKey('ai-1-status'),
+              playerName: 'AI 1',
+              cardCount: right.hand.length,
+            ),
+          ),
+          Positioned.fromRect(
+            rect: board.statusRegionFor(PlayerSeat.left)!,
+            child: CompactAiStatus(
+              key: const ValueKey('ai-3-status'),
+              playerName: 'AI 3',
+              cardCount: left.hand.length,
+            ),
+          ),
+          Positioned(
+            right: 4,
+            top: 4,
+            child: _buildOptionsMenu(),
+          ),
+          Positioned.fromRect(
+            rect: board.humanHandRegion,
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: _buildThreePlayerHumanHand(
+                player: human,
+                geometry: presentation.humanHand,
+                availableWidth: board.humanHandRegion.width,
+              ),
+            ),
+          ),
+          Positioned.fromRect(
+            rect: board.humanControlsRegion,
+            child: _buildHumanControls(
+              presentation.humanHand,
+              board.humanControlsRegion.width,
+              availableHeight: board.humanControlsRegion.height,
+            ),
+          ),
+          Positioned.fromRect(
+            rect: board.pilesRegion,
+            child: LayoutBuilder(
+              builder: (context, pileConstraints) {
+                return Center(
+                  child: Column(
+                    key: const ValueKey('four-player-piles'),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        height: pileIndicatorHeight,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            turnLabel,
+                            key: const ValueKey('turn-indicator'),
+                            maxLines: 1,
+                            softWrap: false,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: pileIndicatorGap),
+                      _buildDrawPile(sharedTableGeometry),
+                      const SizedBox(height: pileGap),
+                      _buildDiscardPile(sharedTableGeometry),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
         ],
       ),
     );

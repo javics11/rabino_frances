@@ -46,4 +46,33 @@ void main() {
     expect(find.byKey(const ValueKey('compact-ai-status-mini-card-1')), findsOneWidget);
     expect(find.byType(CardBackWidget), findsNothing);
   });
+
+  // Supported multiplayer geometry supplies at least 104 px to this badge;
+  // 96 and 108 cover the current narrow responsive range.
+  for (final width in [96.0, 108.0]) {
+    testWidgets('compact AI status fits a $width pixel region', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: width,
+              height: 38,
+              child: const CompactAiStatus(
+                playerName: 'AI 1',
+                cardCount: 14,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('AI 1'), findsOneWidget);
+      expect(find.text('\u00D7 14'), findsOneWidget);
+      expect(find.byKey(const ValueKey('compact-ai-status-cards')), findsOneWidget);
+      final rect = tester.getRect(find.byType(CompactAiStatus));
+      expect(rect.width, lessThanOrEqualTo(width));
+      expect(rect.height, lessThanOrEqualTo(38));
+    });
+  }
 }
