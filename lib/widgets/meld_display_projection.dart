@@ -107,7 +107,15 @@ MeldDisplayProjection _projectionForIndexes(
     while (index < meld.cards.length && !visibleIndexes.contains(index)) {
       index++;
     }
-    items.add(MeldDisplayHiddenSpan(startIndex: start, endIndex: index - 1));
+    final end = index - 1;
+    if (start == end) {
+      items.add(MeldDisplayCard(
+        cardIndex: start,
+        card: meld.cards[start],
+      ));
+    } else {
+      items.add(MeldDisplayHiddenSpan(startIndex: start, endIndex: end));
+    }
   }
   return MeldDisplayProjection(
     items: List.unmodifiable(items),

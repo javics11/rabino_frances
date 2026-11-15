@@ -94,6 +94,40 @@ void main() {
     expect(visibleIndexes(projection), containsAll(<int>[0, 3, 4, 5, 6, 8]));
   });
 
+  test('singleton hidden spans restore the original physical card', () {
+    final meld = run(7, jokers: {3});
+    final projection = project(meld, availableHeight: 80);
+
+    expect(visibleIndexes(projection), List.generate(7, (index) => index));
+    expect(projection.items.whereType<MeldDisplayHiddenSpan>(), isEmpty);
+    for (final item in projection.items.whereType<MeldDisplayCard>()) {
+      expect(item.card, same(meld.cards[item.cardIndex]));
+    }
+  });
+
+  test('two hidden cards remain one placeholder', () {
+    final projection = project(run(8, jokers: {3}), availableHeight: 80);
+    final spans = projection.items.whereType<MeldDisplayHiddenSpan>().toList();
+
+    expect(spans, hasLength(1));
+    expect(spans.single.startIndex, 5);
+    expect(spans.single.endIndex, 6);
+    expect(spans.single.count, 2);
+    expect(spans.every((span) => span.count >= 2), isTrue);
+  });
+
+  test('multiple hidden spans restore singletons but retain larger spans', () {
+    final projection = project(run(12, jokers: {3, 8}), availableHeight: 80);
+    final spans = projection.items.whereType<MeldDisplayHiddenSpan>().toList();
+
+    expect(visibleIndexes(projection), containsAll(<int>[1, 10]));
+    expect(spans, hasLength(1));
+    expect(spans.single.startIndex, 5);
+    expect(spans.single.endIndex, 6);
+    expect(spans.single.count, 2);
+    expect(spans.every((span) => span.count >= 2), isTrue);
+  });
+
   test('spare compressed capacity does not restore natural cards', () {
     final first = project(run(9), availableHeight: 120);
     final second = project(run(9), availableHeight: 160);
